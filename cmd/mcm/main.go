@@ -13,7 +13,9 @@ import (
 	httpx "github.com/vsamtuc/mcm/internal/transport/http"
 )
 
+
 func main() {
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	a := app.New(logger)
 

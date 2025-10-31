@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: initdb-sql
+data:
+  00-create-dbs.sql: |
+    DO
+    $do$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'mcm_app') THEN
+        CREATE ROLE mcm_app LOGIN PASSWORD 'CHANGE_ME';
+      END IF;
+      IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'mcm') THEN
+        CREATE DATABASE mcm OWNER mcm_app;
+      END IF;
+
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keycloak') THEN
+        CREATE ROLE keycloak LOGIN PASSWORD 'CHANGE_ME';
+      END IF;
+      IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak') THEN
+        CREATE DATABASE keycloak OWNER keycloak;
+      END IF;
+    END
+    $do$;

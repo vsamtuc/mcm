@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/yourorg/mcm
+    newTag: dev
+  - name: quay.io/keycloak/keycloak
+    newTag: 24.0.5
+
+patches:
+  - path: patches/mcm-deployment.yaml
+  - path: patches/ingress-host.yaml
+  - path: patches/keycloak-env.yaml
+
+secretGenerator:
+  - name: postgres-superuser
+    literals:
+      - POSTGRES_PASSWORD=devpassword
+  - name: mcm-db-secret
+    literals:
+      - DATABASE_URL=postgres://mcm_app:CHANGE_ME@mcm-postgres.mcm.svc.cluster.local:5432/mcm?sslmode=disable
+  - name: keycloak-db-secret
+    literals:
+      - KC_DB_URL=jdbc:postgresql://mcm-postgres.mcm.svc.cluster.local:5432/keycloak
+      - KC_DB_USERNAME=keycloak
+      - KC_DB_PASSWORD=CHANGE_ME
+  - name: keycloak-admin
+    literals:
+      - username=admin
+      - password=admin
+
+generatorOptions:
+  disableNameSuffixHash: true
+

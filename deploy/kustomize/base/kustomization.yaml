@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mcm
+namePrefix: mcm-
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: mcm
+      app.kubernetes.io/part-of: mcm
+      app.kubernetes.io/managed-by: kustomize
+
+resources:
+  - namespace.yaml
+  - mcm-deployment.yaml
+  - mcm-service.yaml
+  - mcm-ingress.yaml
+  - postgres-statefulset.yaml
+  - postgres-service.yaml
+  - postgres-service-headless.yaml
+  - keycloak-deployment.yaml
+  - keycloak-service.yaml
+  - initdb-configmap.yaml
+
+configMapGenerator:
+  - name: app-config
+    literals:
+      - LOG_LEVEL=info
+
+# Keep names stable for generated objects if you add generators later
+generatorOptions:
+  disableNameSuffixHash: true
