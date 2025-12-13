@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/yourorg/mcm:latest # overridden in overlays
+          image: docker.io/vsam/mcm:none  # overridden in overlays
           ports:
             - name: http
               containerPort: 8080
@@ -27,6 +27,6 @@ spec:
             - name: KEYCLOAK_URL
               value: "http://mcm-keycloak.mcm.svc.cluster.local:8080"
           readinessProbe:
-            httpGet: { path: /healthz, port: http }
+            httpGet: { path: /readyz, port: http }
           livenessProbe:
             httpGet: { path: /livez, port: http }

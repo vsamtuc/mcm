@@ -31,7 +31,19 @@ spec:
               valueFrom: { secretKeyRef: { name: keycloak-admin, key: username } }
             - name: KEYCLOAK_ADMIN_PASSWORD
               valueFrom: { secretKeyRef: { name: keycloak-admin, key: password } }
-          readinessProbe:
-            httpGet: { path: /health/ready, port: http }
-          livenessProbe:
-            httpGet: { path: /health/live,  port: http }
+          
+          # For some strange reason, the probes below cause Keycloak to fail to start in minikube.
+
+          #startupProbe:
+          #  httpGet: { path: /health/started, port: 9000 }
+          #  periodSeconds: 1
+          #  failureThreshold: 600
+          #readinessProbe:
+          #  httpGet: { path: /health/ready, port: 9000 }
+          #  periodSeconds: 10
+          #  failureThreshold: 3
+          #livenessProbe:
+          #  httpGet: { path: /health/live,  port: 9000 }
+          #  periodSeconds: 10
+          #  failureThreshold: 3
+

@@ -8,6 +8,7 @@ spec:
     spec:
       containers:
         - name: api
+          imagePullPolicy: Never
           env:
             - name: LOG_LEVEL
               value: debug

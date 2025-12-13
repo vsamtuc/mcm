@@ -4,7 +4,7 @@ metadata:
   name: api
 spec:
   rules:
-    - host: api.mcm.localtest.me
+    - host: mcm.minikube
       http:
         paths:
           - path: /
@@ -14,3 +14,13 @@ spec:
                 name: api
                 port:
                   number: 80
+    - host: keycloak.mcm.minikube
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080

@@ -5,7 +5,7 @@ resources:
   - ../../base
 
 images:
-  - name: ghcr.io/yourorg/mcm
+  - name: docker.io/vsam/mcm:none
     newTag: dev
   - name: quay.io/keycloak/keycloak
     newTag: 24.0.5
