@@ -1,0 +1,69 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="en" class="h-full" data-theme="winter">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-gtnJoBr3fkbM24M54cMhG5NpzgIk3pVNHqOJzL64JrCw2naiVAF0C+IHmOL5FZ8G" crossorigin="anonymous"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <style>
+    body { font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  </style>
+</head>
+<body class="min-h-screen bg-base-200">
+  <header class="bg-base-100 shadow-md">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-full bg-primary text-base-100 flex items-center justify-center font-bold shadow-lg">
+          {{.BrandInitials}}
+        </div>
+        <div>
+          <p class="text-lg font-semibold tracking-wide uppercase">{{.BrandName}}</p>
+          <p class="text-xs text-base-content/70">{{.BrandTagline}}</p>
+        </div>
+      </div>
+      <nav class="hidden md:flex gap-6 text-sm font-semibold">
+        {{range .Menu}}
+          <a href="{{.Href}}"
+             class="link link-hover flex items-center gap-1"
+             {{if .HxGet}}hx-get="{{.HxGet}}"{{end}}
+             {{if .HxTarget}}hx-target="{{.HxTarget}}"{{end}}
+             {{if .HxSwap}}hx-swap="{{.HxSwap}}"{{end}}>
+            {{.Label}}
+          </a>
+        {{end}}
+      </nav>
+      <div class="flex items-center gap-3">
+        <button class="btn btn-sm btn-ghost md:hidden"
+                hx-get="/ui/menu"
+                hx-target="#mobile-menu"
+                hx-swap="innerHTML">
+          ☰
+        </button>
+        <button class="btn btn-sm btn-primary" x-data @click="$dispatch('open-user-panel')">
+          {{.UserLabel}}
+        </button>
+      </div>
+    </div>
+    <div id="mobile-menu" class="md:hidden border-t border-base-300 px-4 py-2 space-y-2">
+      {{range .Menu}}
+        <a href="{{.Href}}"
+           class="block py-2 text-sm font-medium"
+           {{if .HxGet}}hx-get="{{.HxGet}}"{{end}}
+           {{if .HxTarget}}hx-target="{{.HxTarget}}"{{end}}
+           {{if .HxSwap}}hx-swap="{{.HxSwap}}"{{end}}>
+          {{.Label}}
+        </a>
+      {{end}}
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    {{block "content" .}}{{end}}
+  </main>
+</body>
+</html>
+{{end}}

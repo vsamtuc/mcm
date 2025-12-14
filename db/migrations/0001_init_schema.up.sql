@@ -1,3 +1,5 @@
+
+
 CREATE TABLE professors (
     id              BIGSERIAL PRIMARY KEY,
     keycloak_id     UUID NOT NULL UNIQUE,

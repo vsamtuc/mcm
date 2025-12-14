@@ -1,0 +1,85 @@
+{{define "index"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<section class="grid gap-6 lg:grid-cols-3" x-data="{ selected: null }">
+  <article class="card bg-base-100 shadow-xl lg:col-span-2">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h2 class="card-title">Team Projects</h2>
+        <span class="badge badge-primary badge-lg">Live</span>
+      </div>
+      <p class="text-base-content/70">Plan cohorts, match teams, and track velocity from a single surface.</p>
+      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        <div class="stat">
+          <div class="stat-title">Active Courses</div>
+          <div class="stat-value">12</div>
+          <div class="stat-desc">+2 since last term</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">Students onboarded</div>
+          <div class="stat-value">326</div>
+          <div class="stat-desc">92% verified</div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <aside class="card bg-gradient-to-b from-base-100 to-base-200 shadow-xl">
+    <div class="card-body space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold">Live activity</h3>
+        <button class="btn btn-xs btn-outline"
+                hx-get="{{.ActivityEndpoint}}"
+                hx-target="#activity-feed"
+                hx-swap="innerHTML">
+          Refresh
+        </button>
+      </div>
+      <div id="activity-feed"
+           class="space-y-3 text-sm"
+           hx-get="{{.ActivityEndpoint}}"
+           hx-trigger="load delay:500ms"
+           hx-target="#activity-feed"
+           hx-swap="innerHTML">
+        <p class="text-base-content/50">Loading latest events…</p>
+      </div>
+    </div>
+  </aside>
+
+  <section class="card bg-base-100 shadow-xl lg:col-span-3">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold">Team formation status</h3>
+        <span class="text-sm text-base-content/60">Updated every 15 minutes via htmx</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Course</th>
+              <th>Teams ready</th>
+              <th>Pending approvals</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .TeamSummaries}}
+              <tr hx-get="/hello" hx-trigger="click" hx-target="#team-detail" hx-swap="innerHTML">
+                <td>{{.Course}}</td>
+                <td>{{.Ready}}</td>
+                <td>{{.Pending}}</td>
+                <td><button class="btn btn-xs btn-outline">Inspect</button></td>
+              </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      <div id="team-detail" class="mt-4 text-sm text-base-content/70">
+        Tap a row to fetch details via htmx.
+      </div>
+    </div>
+  </section>
+</section>
+{{end}}

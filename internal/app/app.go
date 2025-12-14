@@ -18,7 +18,7 @@ const (
 	expectedSchemaVersion int64 = 1
 
 	// schemaCheckTimeout is the maximum time to wait for the database schema verification.
-	schemaCheckTimeout          = 5 * time.Second
+	schemaCheckTimeout = 5 * time.Second
 )
 
 type App struct {
