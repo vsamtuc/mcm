@@ -1,0 +1,55 @@
+{
+  "realm": "mcm",
+  "enabled": true,
+
+  "registrationAllowed": true,
+  "verifyEmail": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Default user role"
+      },
+      {
+        "name": "admin",
+        "description": "System administrator"
+      }
+    ]
+  },
+
+  "defaultRoles": [
+    "user"
+  ],
+
+  "clients": [
+    {
+      "clientId": "mcm",
+      "name": "mcm application",
+      "enabled": true,
+
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+
+      "redirectUris": [
+        "http://localhost:8080/oauth/callback",
+        "https://mcm.minikube/oauth/callback"
+      ],
+
+      "webOrigins": [
+        "http://localhost:8080",
+        "https://mcm.minikube"
+      ],
+
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ]
+}

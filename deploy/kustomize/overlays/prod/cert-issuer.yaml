@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1                                                        │ 337   │         basic(name, solverURI, ingress_class="nginx"):: cm.ClusterIssuer {
+kind: Issuer                                                                   │ 338   │             metadata: {
+metadata:
+  name: letsencrypt-production
+spec:
+  acme:
+    email: vsamoladas@tuc.gr
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # preferredChain: ""
+    privateKeySecretRef:
+      name: letsencrypt-production
+    solvers:
+      - http01:
+          ingress:
+            class: nginx

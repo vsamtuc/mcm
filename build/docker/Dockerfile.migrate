@@ -1,0 +1,14 @@
+# Stage for fetching the migrate CLI
+FROM alpine:3.20 AS migrate-cli
+ARG MIGRATE_VERSION=4.17.0
+RUN apk add --no-cache curl ca-certificates \
+    && curl -sSL https://github.com/golang-migrate/migrate/releases/download/v${MIGRATE_VERSION}/migrate.linux-amd64.tar.gz -o /tmp/migrate.tgz \
+    && tar -xzf /tmp/migrate.tgz -C /usr/local/bin migrate \
+    && chmod +x /usr/local/bin/migrate
+
+# Minimal runtime image containing the CLI plus migrations
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=migrate-cli /usr/local/bin/migrate /usr/local/bin/migrate
+COPY db/migrations /migrations
+ENTRYPOINT ["/usr/local/bin/migrate"]

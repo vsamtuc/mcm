@@ -3,14 +3,19 @@ kind: Kustomization
 
 resources:
   - ../../base
+  - cert-issuer.yaml
 
 images:
   - name: ghcr.io/yourorg/mcm
     newTag: ${GIT_SHA}
   - name: quay.io/keycloak/keycloak
-    newTag: 24.0.5
+    newTag: 26.4.7
+  - name: docker.io/vsam/mcm-migrate:none
+    newName: ghcr.io/yourorg/mcm-migrate
+    newTag: ${GIT_SHA}
 
 patches:
   - path: patches/mcm-deployment.yaml
   - path: patches/ingress-host.yaml
   - path: patches/storage-and-resources.yaml
+  - path: patches/keycloak-env.yaml

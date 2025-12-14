@@ -54,5 +54,26 @@ kubectl kustomize deploy/kustomize/mcm/overlays/prod | kubectl apply -f -
 * **Health**: the probes shown are sane defaults; tune to your images/boot-time.
 * **GitHub Actions**: set `GIT_SHA` and run `kubectl kustomize overlays/prod | kubectl apply -f -`.
 
+---
+
+## 🗄️ Schema migrations via Job
+
+Migrations live in `db/migrations` and are executed with the `mcm-migrate` job found under `base/migrate-job`:
+
+```bash
+# Build/push the image referenced by the overlay (defaults: docker.io/vsam/mcm-migrate:dev)
+make migrate-build
+
+# Dev cluster
+kubectl delete job/mcm-migrate -n mcm --ignore-not-found
+kubectl kustomize deploy/kustomize/base/migrate-job/overlays/dev | kubectl apply -n mcm -f -
+kubectl wait --for=condition=complete -n mcm job/mcm-migrate
+
+# Prod (image name/tag overridden via ${GIT_SHA})
+kubectl kustomize deploy/kustomize/base/migrate-job/overlays/prod | kubectl apply -n mcm -f -
+```
+
+Running the job is idempotent; reapply after deleting any finished job to rerun migrations during a rollout. The primary dev/prod overlays already include the migrate job as a resource, so standard `make dev-apply` / `make prod-apply` will automatically create it before deploying the API pods.
+
 If you paste your **image name**, **desired ingress host**, and whether Keycloak should be **dev** or **DB-backed** in **dev**, I’ll tailor the overlays precisely and trim any extras.
 

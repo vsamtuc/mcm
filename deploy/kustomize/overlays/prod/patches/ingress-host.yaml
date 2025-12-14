@@ -1,11 +1,11 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  annotations:
+    cert-manager.io/issuer: letsencrypt-production
   name: api
 spec:
-  tls:
-    - hosts: [api.mcm.example.com]
-      secretName: mcm-api-tls
+  ingressClassName: nginx
   rules:
     - host: api.mcm.example.com
       http:
@@ -14,3 +14,16 @@ spec:
             pathType: Prefix
             backend:
               service: { name: api, port: { number: 80 } }
+    - host: auth.mcm.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: keycloak, port: { number: 8080 } }
+  tls:
+    - hosts: [auth.mcm.example.com, api.mcm.example.com]
+      secretName: mcm-tls
+    # If the two-host certificate does not work with letsencrypt ...
+    #- hosts: [api.mcm.example.com]
+    #  secretName: mcm-api-tls

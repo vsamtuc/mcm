@@ -3,17 +3,21 @@ kind: Kustomization
 
 resources:
   - ../../base
+  - ../../jobs/migrate/overlays/dev
 
 images:
   - name: docker.io/vsam/mcm:none
     newTag: dev
   - name: quay.io/keycloak/keycloak
     newTag: 24.0.5
+  - name: docker.io/vsam/mcm-migrate:none
+    newTag: dev
 
 patches:
   - path: patches/mcm-deployment.yaml
   - path: patches/ingress-host.yaml
   - path: patches/keycloak-env.yaml
+  - path: patches/mcm-migrate-job.yaml
 
 secretGenerator:
   - name: postgres-superuser

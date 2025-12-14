@@ -21,11 +21,17 @@ resources:
   - keycloak-deployment.yaml
   - keycloak-service.yaml
   - initdb-configmap.yaml
+  #- ../jobs/migrate/base
 
 configMapGenerator:
   - name: app-config
     literals:
       - LOG_LEVEL=info
+
+  - name: keycloak-realm
+    files:
+      - keycloak-realm.json
+
 
 # Keep names stable for generated objects if you add generators later
 generatorOptions:

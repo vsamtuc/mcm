@@ -13,7 +13,6 @@ import (
 	httpx "github.com/vsamtuc/mcm/internal/transport/http"
 )
 
-
 func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -24,7 +23,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := &http.Server{Addr: ":8080", Handler: httpx.NewMux()}
+	srv := &http.Server{Addr: ":8080", Handler: httpx.NewMux(a.SchemaReady)}
 
 	go func() {
 		logger.Info("http server listening", "addr", srv.Addr)
