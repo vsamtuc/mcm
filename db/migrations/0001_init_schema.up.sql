@@ -22,13 +22,21 @@ CREATE TABLE courses (
     code              VARCHAR(16) NOT NULL UNIQUE,
     title             TEXT NOT NULL,
     term              VARCHAR(16) NOT NULL,
-    instructor_id     BIGINT NOT NULL REFERENCES professors(id) ON DELETE RESTRICT,
     max_team_size     INTEGER NOT NULL DEFAULT 4,
     add_drop_deadline TIMESTAMPTZ NOT NULL,
     team_lock_date    TIMESTAMPTZ NOT NULL,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (max_team_size > 1),
     CHECK (team_lock_date >= add_drop_deadline)
+);
+
+CREATE TABLE course_instructors (
+    id           BIGSERIAL PRIMARY KEY,
+    course_id    BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    professor_id BIGINT NOT NULL REFERENCES professors(id) ON DELETE CASCADE,
+    role         VARCHAR(32) NOT NULL DEFAULT 'primary',
+    added_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (course_id, professor_id)
 );
 
 CREATE TABLE course_enrollments (
@@ -81,3 +89,5 @@ CREATE INDEX idx_teams_course ON teams(course_id);
 CREATE INDEX idx_team_memberships_team ON team_memberships(team_id);
 CREATE INDEX idx_team_memberships_student ON team_memberships(student_id);
 CREATE INDEX idx_team_change_requests_team ON team_change_requests(team_id);
+CREATE INDEX idx_course_instructors_course ON course_instructors(course_id);
+CREATE INDEX idx_course_instructors_professor ON course_instructors(professor_id);
