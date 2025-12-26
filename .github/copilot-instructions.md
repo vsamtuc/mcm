@@ -15,6 +15,7 @@
 - Run `scripts/dev.sh` before committing; it enforces `go fmt ./...`, `go vet ./...`, and `go test ./... -race`.
 - For quick iterations, `go run ./cmd/mcm` starts the API locally; use `curl :8080/hello` or the probe endpoints to verify responses.
 - Add table-driven tests mirroring `pkg/greet/greet_test.go` when extending pure functions or handler helpers.
+- Integration tests can spin up ephemeral Postgres instances via Testcontainers (`internal/testsupport/postgres`); Docker must be available or run `go test -short` to skip them. See `internal/app/app_integration_test.go` for a pattern that preps `schema_migrations` and exercises `ensureSchema`.
 
 ## Database & Migrations
 - SQL migrations live in `db/migrations` using timestamped `up/down` files (see `0001_init_schema` for the courses/students/teams schema).
