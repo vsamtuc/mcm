@@ -47,6 +47,19 @@
         "https://mcm.minikube"
       ],
 
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "email",
+        "roles"
+      ],
+
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ],
+
       "attributes": {
         "pkce.code.challenge.method": "S256"
       }

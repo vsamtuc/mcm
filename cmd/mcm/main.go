@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	app "github.com/vsamtuc/mcm/internal/app"
+	authjwt "github.com/vsamtuc/mcm/internal/auth/jwt"
 	httpx "github.com/vsamtuc/mcm/internal/transport/http"
 )
 
@@ -23,7 +26,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := &http.Server{Addr: ":8080", Handler: httpx.NewMux(a.SchemaReady)}
+	handler := httpx.NewMux(a.SchemaReady, a.Courses())
+	authHandler, err := withAuthMiddleware(handler)
+	if err != nil {
+		logger.Error("failed to init auth middleware", "err", err)
+		os.Exit(1)
+	}
+
+	srv := &http.Server{Addr: ":8080", Handler: authHandler}
 
 	go func() {
 		logger.Info("http server listening", "addr", srv.Addr)
@@ -43,4 +53,58 @@ func main() {
 
 	_ = srv.Shutdown(ctx)
 	_ = a.Stop(ctx)
+}
+
+func withAuthMiddleware(next http.Handler) (http.Handler, error) {
+	issuerURL, err := resolveIssuerURL()
+	if err != nil {
+		return nil, err
+	}
+	clientID := strings.TrimSpace(os.Getenv("KEYCLOAK_CLIENT_ID"))
+	if clientID == "" {
+		return nil, fmt.Errorf("KEYCLOAK_CLIENT_ID must be set")
+	}
+	skipPaths := append([]string{"/livez", "/readyz"}, additionalSkipPaths()...)
+	mw, err := authjwt.New(context.Background(), authjwt.Config{
+		IssuerURL: issuerURL,
+		ClientID:  clientID,
+		SkipPaths: skipPaths,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return mw.Wrap(next), nil
+}
+
+func resolveIssuerURL() (string, error) {
+	if issuer := strings.TrimSpace(os.Getenv("KEYCLOAK_ISSUER_URL")); issuer != "" {
+		return issuer, nil
+	}
+	baseURL := strings.TrimSpace(os.Getenv("KEYCLOAK_URL"))
+	if baseURL == "" {
+		return "", fmt.Errorf("KEYCLOAK_URL or KEYCLOAK_ISSUER_URL must be set")
+	}
+	realm := strings.TrimSpace(os.Getenv("KEYCLOAK_REALM"))
+	if realm == "" {
+		realm = "mcm"
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	return fmt.Sprintf("%s/realms/%s", baseURL, realm), nil
+}
+
+func additionalSkipPaths() []string {
+	configured := strings.TrimSpace(os.Getenv("AUTH_SKIP_PATHS"))
+	if configured == "" {
+		return nil
+	}
+	parts := strings.Split(configured, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		p := strings.TrimSpace(part)
+		if p == "" {
+			continue
+		}
+		result = append(result, p)
+	}
+	return result
 }

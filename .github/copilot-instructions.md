@@ -1,14 +1,14 @@
 # Copilot Instructions
 
 ## Architecture & Runtime
-- `cmd/mcm/main.go` boots `internal/app.App` for dependency init, then exposes `http.Server` on `:8080` using `internal/transport/http.NewMux`.
+- `cmd/mcm/main.go` boots `internal/app.App` for dependency init, then exposes `http.Server` on `:8080` using `internal/transport/http.NewMux` (which now needs both a schema readiness callback and a `course.Store`).
 - Keep lifecycle logic (`Start`/`Stop`) inside `internal/app/app.go`; wire new resources there so the graceful shutdown block can drain them.
-- HTTP handlers currently live in `internal/transport/http/handler.go` using the stdlib mux. Prefer small handler funcs registered inside `NewMux` and call domain code in lower layers (e.g., `pkg` packages) instead of embedding logic inline.
+- HTTP handlers currently live in `internal/transport/http/handler.go` using the stdlib mux. Prefer small handler funcs registered inside `NewMux` and call domain code in lower layers (e.g., `pkg` packages) instead of embedding logic inline. `/api/courses` exposes CRUD over the in-memory store for now.
 - Health endpoints `/livez` and `/readyz` are consumed by Kubernetes probes in `deploy/kustomize/base/mcm-deployment.yaml`; keep them cheap and always-on.
 
 ## Coding Patterns
 - Project targets Go 1.25.3 (`go.mod`); use `slog` for logging and pass contexts explicitly when adding long-running work.
-- Shared, importable helpers belong under `pkg/` (see `pkg/greet` and its unit test). Code that should remain internal to the service belongs under `internal/`.
+- Shared, importable helpers belong under `pkg/` (see `pkg/greet` and the new `pkg/course` types + validation). Code that should remain internal to the service belongs under `internal/` (e.g., `internal/course/memory` for the dev-only store backing the `/api/courses` endpoints).
 - Stick with standard library HTTP primitives; no third-party router is wired today, so adding one requires updating `httpx.NewMux` and the server wiring in `main.go`.
 
 ## Local Dev & Testing

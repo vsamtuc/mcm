@@ -1,10 +1,16 @@
 package http
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/vsamtuc/mcm/pkg/course"
 	"github.com/vsamtuc/mcm/pkg/greet"
 )
 
@@ -35,11 +41,12 @@ type indexPageData struct {
 
 // NewMux creates a new HTTP mux with health check endpoints.
 // The schemaReady function is used to determine readiness status.
-func NewMux(schemaReady func() bool) http.Handler {
+func NewMux(schemaReady func() bool, courseSvc course.Service) http.Handler {
 	if schemaReady == nil {
 		schemaReady = func() bool { return true }
 	}
 	mux := http.NewServeMux()
+	registerCourseRoutes(mux, courseSvc)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
@@ -97,5 +104,128 @@ func defaultIndexPageData() indexPageData {
 			{Course: "CS 544", Ready: "9", Pending: "5"},
 			{Course: "EE 201", Ready: "14", Pending: "1"},
 		},
+	}
+}
+
+func registerCourseRoutes(mux *http.ServeMux, svc course.Service) {
+	if svc == nil {
+		panic("course service is nil")
+	}
+	h := &courseHandler{service: svc}
+	mux.HandleFunc("/api/courses", h.collection)
+	mux.HandleFunc("/api/courses/", h.item)
+}
+
+type courseHandler struct {
+	service course.Service
+}
+
+func (h *courseHandler) collection(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.listCourses(w, r)
+	case http.MethodPost:
+		h.createCourse(w, r)
+	default:
+		w.Header().Set("Allow", "GET,POST")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (h *courseHandler) item(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(strings.TrimPrefix(r.URL.Path, "/api/courses/"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid course id")
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		h.getCourse(w, r, id)
+	case http.MethodPut:
+		h.updateCourse(w, r, id)
+	case http.MethodDelete:
+		h.deleteCourse(w, r, id)
+	default:
+		w.Header().Set("Allow", "GET,PUT,DELETE")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (h *courseHandler) listCourses(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.List(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+func (h *courseHandler) getCourse(w http.ResponseWriter, r *http.Request, id int64) {
+	item, err := h.service.Get(r.Context(), id)
+	if err != nil {
+		handleCourseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+func (h *courseHandler) createCourse(w http.ResponseWriter, r *http.Request) {
+	var input course.CreateCourseInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON payload")
+		return
+	}
+	created, err := h.service.Create(r.Context(), input)
+	if err != nil {
+		handleCourseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, created)
+}
+
+func (h *courseHandler) updateCourse(w http.ResponseWriter, r *http.Request, id int64) {
+	var input course.UpdateCourseInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON payload")
+		return
+	}
+	updated, err := h.service.Update(r.Context(), id, input)
+	if err != nil {
+		handleCourseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (h *courseHandler) deleteCourse(w http.ResponseWriter, r *http.Request, id int64) {
+	if err := h.service.Delete(r.Context(), id); err != nil {
+		handleCourseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusNoContent, nil)
+}
+
+func parseID(raw string) (int64, error) {
+	trimmed := strings.Trim(strings.TrimSpace(raw), "/")
+	if trimmed == "" {
+		return 0, fmt.Errorf("empty id")
+	}
+	return strconv.ParseInt(trimmed, 10, 64)
+}
+
+func handleCourseError(w http.ResponseWriter, err error) {
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, nil)
+	case errors.Is(err, course.ErrNotFound):
+		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		writeError(w, http.StatusRequestTimeout, err.Error())
+	default:
+		writeError(w, http.StatusBadRequest, err.Error())
 	}
 }

@@ -11,6 +11,10 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/vsamtuc/mcm/internal/course/memory"
+	"github.com/vsamtuc/mcm/internal/course/service"
+	"github.com/vsamtuc/mcm/pkg/course"
 )
 
 const (
@@ -24,10 +28,13 @@ const (
 type App struct {
 	log         *slog.Logger
 	schemaReady atomic.Bool
+	courseStore course.Store
+	courseSvc   course.Service
 }
 
 func New(logger *slog.Logger) *App {
-	return &App{log: logger}
+	store := memory.NewStore()
+	return &App{log: logger, courseStore: store, courseSvc: service.New(store)}
 }
 
 func (a *App) Start(ctx context.Context) error {
@@ -102,4 +109,9 @@ func (a *App) ensureSchema(parent context.Context) error {
 // SchemaReady returns true once ensureSchema completes successfully.
 func (a *App) SchemaReady() bool {
 	return a.schemaReady.Load()
+}
+
+// Courses exposes the backing course store for handlers.
+func (a *App) Courses() course.Service {
+	return a.courseSvc
 }
