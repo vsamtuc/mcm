@@ -23,7 +23,9 @@ type Instance struct {
 // Start launches a Postgres container for tests and registers cleanup with t.Cleanup.
 func Start(ctx context.Context, t *testing.T) *Instance {
 	t.Helper()
-	
+
+	t.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+
 	containerCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 
 	pgContainer, err := pg.RunContainer(containerCtx,

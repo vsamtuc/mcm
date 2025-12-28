@@ -26,6 +26,7 @@ CREATE TABLE courses (
     add_drop_deadline TIMESTAMPTZ NOT NULL,
     team_lock_date    TIMESTAMPTZ NOT NULL,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (max_team_size >= 1),
     CHECK (team_lock_date >= add_drop_deadline)
 );
