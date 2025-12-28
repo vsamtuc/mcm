@@ -20,3 +20,11 @@ Manage a Kubernetes cluster on behalf of multiple users.
 - `make dev-apply` / `make prod-apply` wrap the main Kustomize overlays under `deploy/kustomize/overlays` (which now include the migrate job resource).
 - The `mcm-migrate` job fires automatically on each apply; rerun manually via the dedicated targets if you need to verify schema changes without touching the API Deployment.
 
+## Keycloak realm
+- Import `deploy/kustomize/base/keycloak-realm.json` into your cluster Keycloak before exercising authenticated endpoints. The CLI bundled with the Keycloak pod works well:
+	- `kubectl -n mcm exec deploy/mcm-keycloak -- /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user $KEYCLOAK_ADMIN --password $KEYCLOAK_ADMIN_PASSWORD`
+	- `kubectl -n mcm exec deploy/mcm-keycloak -- /opt/keycloak/bin/kcadm.sh create realms -f /opt/keycloak/data/import/keycloak-realm.json`
+- The realm now seeds a default `mcm-admin` user with the `admin` realm role and a temporary password (`ChangeMe123!`). Log into Keycloak after the import and set a permanent password before sharing the account.
+- When you tweak the realm JSON, rerun the second command to re-import so that the `profile`, `email`, and `roles` scopes continue to show up in the JWTs consumed by the API.
+- Override `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, and (optionally) `AUTH_SKIP_PATHS` via the dev/prod deployment patches to match your cluster DNS if you move Keycloak behind an ingress.
+
