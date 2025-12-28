@@ -14,16 +14,20 @@ import (
 
 // Config controls JWT middleware behavior.
 type Config struct {
-	IssuerURL   string
-	ClientID    string
-	SkipPaths   []string
-	HTTPTimeout time.Duration
+	IssuerURL        string
+	ClientID         string
+	SkipPaths        []string
+	HTTPTimeout      time.Duration
+	SessionCookie    string
+	BrowserIssuerURL string
 }
 
 // Middleware validates bearer tokens issued by Keycloak and injects the user into the request context.
 type Middleware struct {
-	verifier  *oidc.IDTokenVerifier
-	skipPaths map[string]struct{}
+	verifier       *oidc.IDTokenVerifier
+	skipPaths      map[string]struct{}
+	cookieName     string
+	allowedIssuers []string
 }
 
 // New constructs the middleware using discovery from the issuer URL.
@@ -40,7 +44,8 @@ func New(ctx context.Context, cfg Config) (*Middleware, error) {
 	if err != nil {
 		return nil, fmt.Errorf("discover OIDC provider: %w", err)
 	}
-	verifier := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
+	verifier := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID, SkipIssuerCheck: true})
+	allowed := uniqueIssuers([]string{normalizeIssuer(cfg.IssuerURL), normalizeIssuer(cfg.BrowserIssuerURL)})
 	skips := make(map[string]struct{}, len(cfg.SkipPaths))
 	for _, p := range cfg.SkipPaths {
 		if p == "" {
@@ -48,19 +53,19 @@ func New(ctx context.Context, cfg Config) (*Middleware, error) {
 		}
 		skips[p] = struct{}{}
 	}
-	return &Middleware{verifier: verifier, skipPaths: skips}, nil
+	cookie := strings.TrimSpace(cfg.SessionCookie)
+	return &Middleware{verifier: verifier, skipPaths: skips, cookieName: cookie, allowedIssuers: allowed}, nil
 }
 
 // Wrap applies the middleware to an http.Handler.
 func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := m.skipPaths[r.URL.Path]; ok {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		token, err := bearerToken(r.Header.Get("Authorization"))
+		token, err := m.tokenFromRequest(r)
 		if err != nil {
+			if errors.Is(err, errMissingToken) && m.shouldSkip(r.URL.Path) {
+				next.ServeHTTP(w, r)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
@@ -68,6 +73,10 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		idToken, err := m.verifier.Verify(r.Context(), token)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("invalid token: %v", err), http.StatusUnauthorized)
+			return
+		}
+		if !m.isIssuerAllowed(idToken.Issuer) {
+			http.Error(w, fmt.Sprintf("invalid issuer: %s", idToken.Issuer), http.StatusUnauthorized)
 			return
 		}
 
@@ -87,6 +96,31 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
+var errMissingToken = errors.New("missing token")
+
+func (m *Middleware) tokenFromRequest(r *http.Request) (string, error) {
+	if token, err := bearerToken(r.Header.Get("Authorization")); err == nil {
+		return token, nil
+	}
+	if m.cookieName != "" && r != nil {
+		if c, err := r.Cookie(m.cookieName); err == nil {
+			val := strings.TrimSpace(c.Value)
+			if val != "" {
+				return val, nil
+			}
+		}
+	}
+	return "", errMissingToken
+}
+
+func (m *Middleware) shouldSkip(path string) bool {
+	if path == "" {
+		return false
+	}
+	_, ok := m.skipPaths[path]
+	return ok
+}
+
 func bearerToken(header string) (string, error) {
 	if header == "" {
 		return "", errors.New("missing Authorization header")
@@ -99,8 +133,8 @@ func bearerToken(header string) (string, error) {
 }
 
 type keycloakClaims struct {
-	PreferredUsername string `json:"preferred_username"`
-	Email             string `json:"email"`
+	PreferredUsername string                  `json:"preferred_username"`
+	Email             string                  `json:"email"`
 	ResourceAccess    map[string]clientAccess `json:"resource_access"`
 	RealmAccess       clientAccess            `json:"realm_access"`
 	Roles             []string                `json:"-"`
@@ -136,4 +170,36 @@ func timeoutOrDefault(d time.Duration) time.Duration {
 		return 5 * time.Second
 	}
 	return d
+}
+
+func (m *Middleware) isIssuerAllowed(issuer string) bool {
+	norm := normalizeIssuer(issuer)
+	for _, allowed := range m.allowedIssuers {
+		if allowed == norm {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeIssuer(issuer string) string {
+	issuer = strings.TrimSpace(issuer)
+	issuer = strings.TrimSuffix(issuer, "/")
+	return issuer
+}
+
+func uniqueIssuers(issuers []string) []string {
+	seen := make(map[string]struct{})
+	result := make([]string, 0, len(issuers))
+	for _, iss := range issuers {
+		if iss == "" {
+			continue
+		}
+		if _, ok := seen[iss]; ok {
+			continue
+		}
+		seen[iss] = struct{}{}
+		result = append(result, iss)
+	}
+	return result
 }

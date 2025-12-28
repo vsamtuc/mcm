@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vsamtuc/mcm/pkg/auth"
 	"github.com/vsamtuc/mcm/pkg/course"
 	"github.com/vsamtuc/mcm/pkg/greet"
 )
@@ -29,30 +30,44 @@ type teamSummary struct {
 }
 
 type indexPageData struct {
-	Title            string
-	BrandName        string
-	BrandInitials    string
-	BrandTagline     string
-	Menu             []navLink
-	UserLabel        string
-	ActivityEndpoint string
-	TeamSummaries    []teamSummary
+	Title             string
+	BrandName         string
+	BrandInitials     string
+	BrandTagline      string
+	Menu              []navLink
+	UserLabel         string
+	UserEmail         string
+	UserAvatar        string
+	UserAuthenticated bool
+	ActivityEndpoint  string
+	AuthLoginURL      string
+	AuthLogoutURL     string
+	TeamSummaries     []teamSummary
 }
 
-// NewMux creates a new HTTP mux with health check endpoints.
+// NewMux creates a new HTTP mux with health check endpoints and authentication routes.
 // The schemaReady function is used to determine readiness status.
-func NewMux(schemaReady func() bool, courseSvc course.Service) http.Handler {
+func NewMux(schemaReady func() bool, courseSvc course.Service, authCfg AuthConfig) (http.Handler, error) {
 	if schemaReady == nil {
 		schemaReady = func() bool { return true }
 	}
+	authCtrl, err := newAuthController(context.Background(), authCfg)
+	if err != nil {
+		return nil, err
+	}
 	mux := http.NewServeMux()
 	registerCourseRoutes(mux, courseSvc)
+	authCtrl.register(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
-		renderTemplate(w, "index", defaultIndexPageData())
+		data := defaultIndexPageData()
+		if user, ok := auth.UserFrom(r.Context()); ok {
+			applyUserToIndex(&data, user)
+		}
+		renderTemplate(w, "index", data)
 	})
 	mux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -82,7 +97,7 @@ func NewMux(schemaReady func() bool, courseSvc course.Service) http.Handler {
 			</div>
 		</div>`, now, now)
 	})
-	return mux
+	return mux, nil
 }
 
 func defaultIndexPageData() indexPageData {
@@ -91,7 +106,9 @@ func defaultIndexPageData() indexPageData {
 		BrandName:        "MCM",
 		BrandInitials:    "M",
 		BrandTagline:     "Student cloud for team projects",
-		UserLabel:        "session",
+		UserLabel:        "Sign in",
+		AuthLoginURL:     LoginPath,
+		AuthLogoutURL:    LogoutPath,
 		ActivityEndpoint: "/ui/activity",
 		Menu: []navLink{
 			{Label: "Dashboard", Href: "/"},
@@ -105,6 +122,65 @@ func defaultIndexPageData() indexPageData {
 			{Course: "EE 201", Ready: "14", Pending: "1"},
 		},
 	}
+}
+
+func applyUserToIndex(data *indexPageData, user auth.User) {
+	if data == nil {
+		return
+	}
+	data.UserAuthenticated = true
+	data.UserLabel = userDisplayName(user)
+	data.UserEmail = user.Email
+	data.UserAvatar = userInitials(user)
+}
+
+func userDisplayName(user auth.User) string {
+	if user.Username != "" {
+		return user.Username
+	}
+	if user.Email != "" {
+		return user.Email
+	}
+	if user.Subject != "" {
+		return user.Subject
+	}
+	return "Signed in"
+}
+
+func userInitials(user auth.User) string {
+	name := user.Username
+	if name == "" {
+		name = user.Email
+	}
+	if name == "" {
+		name = user.Subject
+	}
+	parts := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '.' || r == '_' || r == '-' || r == ' '
+	})
+	if len(parts) == 0 {
+		return "U"
+	}
+	if len(parts) == 1 {
+		runes := []rune(parts[0])
+		if len(runes) >= 2 {
+			return strings.ToUpper(string(runes[0:2]))
+		}
+		return strings.ToUpper(string(runes[0:1]))
+	}
+	first := firstRune(parts[0])
+	second := firstRune(parts[1])
+	if second == "" {
+		return strings.ToUpper(first)
+	}
+	return strings.ToUpper(first + second)
+}
+
+func firstRune(s string) string {
+	for _, r := range s {
+		return string(r)
+	}
+	return ""
 }
 
 func registerCourseRoutes(mux *http.ServeMux, svc course.Service) {

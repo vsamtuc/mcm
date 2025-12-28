@@ -26,8 +26,35 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler := httpx.NewMux(a.SchemaReady, a.Courses())
-	authHandler, err := withAuthMiddleware(handler)
+	issuerURL, err := resolveIssuerURL()
+	if err != nil {
+		logger.Error("failed to resolve issuer", "err", err)
+		os.Exit(1)
+	}
+	browserIssuerURL, err := resolveBrowserIssuerURL()
+	if err != nil {
+		logger.Error("failed to resolve browser issuer", "err", err)
+		os.Exit(1)
+	}
+	if browserIssuerURL == "" {
+		browserIssuerURL = issuerURL
+	}
+	clientID := strings.TrimSpace(os.Getenv("KEYCLOAK_CLIENT_ID"))
+	if clientID == "" {
+		logger.Error("KEYCLOAK_CLIENT_ID must be set")
+		os.Exit(1)
+	}
+	handler, err := httpx.NewMux(a.SchemaReady, a.Courses(), httpx.AuthConfig{
+		IssuerURL:     issuerURL,
+		BrowserURL:    browserIssuerURL,
+		ClientID:      clientID,
+		SessionCookie: httpx.SessionCookieName,
+	})
+	if err != nil {
+		logger.Error("failed to init http mux", "err", err)
+		os.Exit(1)
+	}
+	authHandler, err := withAuthMiddleware(handler, issuerURL, browserIssuerURL, clientID)
 	if err != nil {
 		logger.Error("failed to init auth middleware", "err", err)
 		os.Exit(1)
@@ -58,20 +85,15 @@ func main() {
 	_ = a.Stop(ctx)
 }
 
-func withAuthMiddleware(next http.Handler) (http.Handler, error) {
-	issuerURL, err := resolveIssuerURL()
-	if err != nil {
-		return nil, err
-	}
-	clientID := strings.TrimSpace(os.Getenv("KEYCLOAK_CLIENT_ID"))
-	if clientID == "" {
-		return nil, fmt.Errorf("KEYCLOAK_CLIENT_ID must be set")
-	}
-	skipPaths := append([]string{"/livez", "/readyz"}, additionalSkipPaths()...)
+func withAuthMiddleware(next http.Handler, issuerURL, browserIssuerURL, clientID string) (http.Handler, error) {
+	skipPaths := []string{"/", httpx.LoginPath, httpx.LogoutPath, httpx.CallbackPath, "/livez", "/readyz"}
+	skipPaths = append(skipPaths, additionalSkipPaths()...)
 	mw, err := authjwt.New(context.Background(), authjwt.Config{
-		IssuerURL: issuerURL,
-		ClientID:  clientID,
-		SkipPaths: skipPaths,
+		IssuerURL:        issuerURL,
+		BrowserIssuerURL: browserIssuerURL,
+		ClientID:         clientID,
+		SkipPaths:        skipPaths,
+		SessionCookie:    httpx.SessionCookieName,
 	})
 	if err != nil {
 		return nil, err
@@ -86,6 +108,22 @@ func resolveIssuerURL() (string, error) {
 	baseURL := strings.TrimSpace(os.Getenv("KEYCLOAK_URL"))
 	if baseURL == "" {
 		return "", fmt.Errorf("KEYCLOAK_URL or KEYCLOAK_ISSUER_URL must be set")
+	}
+	realm := strings.TrimSpace(os.Getenv("KEYCLOAK_REALM"))
+	if realm == "" {
+		realm = "mcm"
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	return fmt.Sprintf("%s/realms/%s", baseURL, realm), nil
+}
+
+func resolveBrowserIssuerURL() (string, error) {
+	if issuer := strings.TrimSpace(os.Getenv("KEYCLOAK_BROWSER_ISSUER_URL")); issuer != "" {
+		return issuer, nil
+	}
+	baseURL := strings.TrimSpace(os.Getenv("KEYCLOAK_BROWSER_URL"))
+	if baseURL == "" {
+		return "", nil
 	}
 	realm := strings.TrimSpace(os.Getenv("KEYCLOAK_REALM"))
 	if realm == "" {

@@ -14,6 +14,8 @@ spec:
               value: debug
             - name: KEYCLOAK_URL
               value: "http://mcm-keycloak.mcm.svc.cluster.local:8080"
+            - name: KEYCLOAK_BROWSER_URL
+              value: "http://keycloak.mcm.minikube"
             - name: KEYCLOAK_REALM
               value: mcm
             - name: KEYCLOAK_CLIENT_ID

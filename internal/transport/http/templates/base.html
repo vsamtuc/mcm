@@ -43,9 +43,32 @@
                 hx-swap="innerHTML">
           ☰
         </button>
-        <button class="btn btn-sm btn-primary" x-data @click="$dispatch('open-user-panel')">
-          {{.UserLabel}}
-        </button>
+        {{if .UserAuthenticated}}
+          <div class="dropdown dropdown-end">
+            <div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-2">
+              <div class="avatar placeholder">
+                <div class="bg-primary text-primary-content rounded-full w-8">
+                  <span>{{.UserAvatar}}</span>
+                </div>
+              </div>
+              <span class="hidden md:inline text-sm font-semibold">{{.UserLabel}}</span>
+            </div>
+            <div tabindex="0" class="dropdown-content bg-base-100 text-sm rounded-box shadow-lg mt-3 w-60 p-4 space-y-2">
+              <p class="text-xs uppercase tracking-wide text-base-content/60">Signed in</p>
+              <p class="font-semibold break-all">{{.UserLabel}}</p>
+              {{if .UserEmail}}
+                <p class="text-xs text-base-content/70 break-all">{{.UserEmail}}</p>
+              {{end}}
+              <form method="post" action="{{.AuthLogoutURL}}" class="pt-2">
+                <button type="submit" class="btn btn-sm btn-outline w-full">Sign out</button>
+              </form>
+            </div>
+          </div>
+        {{else}}
+          <a class="btn btn-sm btn-primary" href="{{.AuthLoginURL}}">
+            Sign in
+          </a>
+        {{end}}
       </div>
     </div>
     <div id="mobile-menu" class="md:hidden border-t border-base-300 px-4 py-2 space-y-2">

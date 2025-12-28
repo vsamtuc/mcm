@@ -32,14 +32,14 @@
       "enabled": true,
 
       "protocol": "openid-connect",
-      "publicClient": false,
+      "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
 
       "redirectUris": [
-        "http://localhost:8080/oauth/callback",
-        "http://mcm.minikube/oauth/callback"
+        "http://localhost:8080/auth/callback",
+        "http://mcm.minikube/auth/callback"
       ],
 
       "webOrigins": [
@@ -61,7 +61,8 @@
       ],
 
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8080/*\nhttp://mcm.minikube/*"
       }
     }
   ],
@@ -73,8 +74,10 @@
       "lastName": "Administrator",
       "email": "admin@mcm.local",
       "enabled": true,
-      "emailVerified": false,
+      "emailVerified": true,
       "realmRoles": [
+        "default-roles-mcm",
+        "user",
         "admin"
       ],
       "credentials": [
