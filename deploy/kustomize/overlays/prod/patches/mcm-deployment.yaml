@@ -4,3 +4,16 @@ metadata:
   name: api
 spec:
   replicas: 3
+  template:
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: KEYCLOAK_URL
+              value: "http://mcm-keycloak.mcm.svc.cluster.local:8080"
+            - name: KEYCLOAK_REALM
+              value: mcm
+            - name: KEYCLOAK_CLIENT_ID
+              value: mcm
+            - name: AUTH_SKIP_PATHS
+              value: ""

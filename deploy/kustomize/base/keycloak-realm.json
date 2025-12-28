@@ -39,12 +39,12 @@
 
       "redirectUris": [
         "http://localhost:8080/oauth/callback",
-        "https://mcm.minikube/oauth/callback"
+        "http://mcm.minikube/oauth/callback"
       ],
 
       "webOrigins": [
         "http://localhost:8080",
-        "https://mcm.minikube"
+        "http://mcm.minikube"
       ],
 
       "defaultClientScopes": [
@@ -63,6 +63,27 @@
       "attributes": {
         "pkce.code.challenge.method": "S256"
       }
+    }
+  ],
+
+  "users": [
+    {
+      "username": "mcm-admin",
+      "firstName": "MCM",
+      "lastName": "Administrator",
+      "email": "admin@mcm.local",
+      "enabled": true,
+      "emailVerified": false,
+      "realmRoles": [
+        "admin"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ChangeMe123!",
+          "temporary": true
+        }
+      ]
     }
   ]
 }

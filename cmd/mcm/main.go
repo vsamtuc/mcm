@@ -33,7 +33,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := &http.Server{Addr: ":8080", Handler: authHandler}
+	logger.Info("auth middleware initialized")
+	loggedHandler := logRequests(logger, authHandler)
+
+	srv := &http.Server{Addr: ":8080", Handler: loggedHandler}
 
 	go func() {
 		logger.Info("http server listening", "addr", srv.Addr)
@@ -107,4 +110,32 @@ func additionalSkipPaths() []string {
 		result = append(result, p)
 	}
 	return result
+}
+
+func logRequests(logger *slog.Logger, next http.Handler) http.Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		start := time.Now()
+		next.ServeHTTP(rec, r)
+		duration := time.Since(start)
+		logger.Info("http request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rec.status,
+			"duration", duration,
+		)
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
 }
