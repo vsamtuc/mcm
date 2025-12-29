@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,52 +13,75 @@ import (
 	"time"
 
 	app "github.com/vsamtuc/mcm/internal/app"
+	devauth "github.com/vsamtuc/mcm/internal/auth/devel"
 	authjwt "github.com/vsamtuc/mcm/internal/auth/jwt"
 	httpx "github.com/vsamtuc/mcm/internal/transport/http"
+	"github.com/vsamtuc/mcm/pkg/auth"
 )
 
 func main() {
 
+	develFlag := parseFlags()
+	if develFlag {
+		_ = os.Setenv("MCM_DEVEL_MODE", "1")
+	} else {
+		_ = os.Setenv("MCM_DEVEL_MODE", "0")
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	a := app.New(logger)
+	devel := a.DevelMode()
 
 	if err := a.Start(context.Background()); err != nil {
 		logger.Error("app start failed", "err", err)
 		os.Exit(1)
 	}
 
-	issuerURL, err := resolveIssuerURL()
-	if err != nil {
-		logger.Error("failed to resolve issuer", "err", err)
-		os.Exit(1)
+	authCfg := httpx.AuthConfig{SessionCookie: httpx.SessionCookieName, DevMode: devel}
+	var issuerURL, browserIssuerURL, clientID string
+	var err error
+	if !devel {
+		issuerURL, err = resolveIssuerURL()
+		if err != nil {
+			logger.Error("failed to resolve issuer", "err", err)
+			os.Exit(1)
+		}
+		browserIssuerURL, err = resolveBrowserIssuerURL()
+		if err != nil {
+			logger.Error("failed to resolve browser issuer", "err", err)
+			os.Exit(1)
+		}
+		if browserIssuerURL == "" {
+			browserIssuerURL = issuerURL
+		}
+		clientID = strings.TrimSpace(os.Getenv("KEYCLOAK_CLIENT_ID"))
+		if clientID == "" {
+			logger.Error("KEYCLOAK_CLIENT_ID must be set")
+			os.Exit(1)
+		}
+		authCfg.IssuerURL = issuerURL
+		authCfg.BrowserURL = browserIssuerURL
+		authCfg.ClientID = clientID
 	}
-	browserIssuerURL, err := resolveBrowserIssuerURL()
-	if err != nil {
-		logger.Error("failed to resolve browser issuer", "err", err)
-		os.Exit(1)
-	}
-	if browserIssuerURL == "" {
-		browserIssuerURL = issuerURL
-	}
-	clientID := strings.TrimSpace(os.Getenv("KEYCLOAK_CLIENT_ID"))
-	if clientID == "" {
-		logger.Error("KEYCLOAK_CLIENT_ID must be set")
-		os.Exit(1)
-	}
-	handler, err := httpx.NewMux(a.SchemaReady, a.Service(), httpx.AuthConfig{
-		IssuerURL:     issuerURL,
-		BrowserURL:    browserIssuerURL,
-		ClientID:      clientID,
-		SessionCookie: httpx.SessionCookieName,
-	})
+	handler, err := httpx.NewMux(a.SchemaReady, a.Service(), authCfg)
 	if err != nil {
 		logger.Error("failed to init http mux", "err", err)
 		os.Exit(1)
 	}
-	authHandler, err := withAuthMiddleware(handler, issuerURL, browserIssuerURL, clientID)
-	if err != nil {
-		logger.Error("failed to init auth middleware", "err", err)
-		os.Exit(1)
+	var authHandler http.Handler
+	if devel {
+		devMW := devauth.New(devauth.Config{
+			CookieName:  httpx.SessionCookieName,
+			DefaultUser: auth.User{Subject: "dev-admin", Username: "Dev Admin", Email: "dev-admin@example.com", Roles: []string{"admin", "professor"}},
+			SkipPaths:   []string{"/livez", "/readyz"},
+		})
+		authHandler = devMW.Wrap(handler)
+	} else {
+		authHandler, err = withAuthMiddleware(handler, issuerURL, browserIssuerURL, clientID)
+		if err != nil {
+			logger.Error("failed to init auth middleware", "err", err)
+			os.Exit(1)
+		}
 	}
 
 	logger.Info("auth middleware initialized")
@@ -176,4 +200,16 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+func parseFlags() bool {
+	defaultDevel := envDevelEnabled()
+	devel := flag.Bool("devel", defaultDevel, "enable development mode (equivalent to setting MCM_DEVEL_MODE)")
+	flag.Parse()
+	return *devel
+}
+
+func envDevelEnabled() bool {
+	val := strings.ToLower(strings.TrimSpace(os.Getenv("MCM_DEVEL_MODE")))
+	return val == "1" || val == "true" || val == "yes" || val == "on"
 }

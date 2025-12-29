@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -33,15 +34,23 @@ type App struct {
 	db          *sql.DB
 	persistence store.Store
 	service     application.Service
+	devel       bool
 }
 
 func New(logger *slog.Logger) *App {
 	st := memorystore.New()
-	return &App{log: logger, persistence: st, service: appservice.New(st)}
+	a := &App{log: logger, persistence: st, service: appservice.New(st), devel: develModeEnabled()}
+	if a.devel {
+		a.schemaReady.Store(true)
+	}
+	return a
 }
 
 func (a *App) Start(ctx context.Context) error {
-	a.log.Info("starting app")
+	a.log.Info("starting app", "devel_mode", a.devel)
+	if a.devel {
+		return nil
+	}
 	a.schemaReady.Store(false)
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -66,6 +75,9 @@ func (a *App) Start(ctx context.Context) error {
 
 func (a *App) Stop(ctx context.Context) error {
 	a.log.Info("stopping app", "timeout", "5s")
+	if a.devel {
+		return nil
+	}
 	if a.db != nil {
 		if err := a.db.Close(); err != nil {
 			a.log.Error("close database", "err", err)
@@ -123,4 +135,14 @@ func (a *App) SchemaReady() bool {
 // Service exposes the application service for HTTP handlers.
 func (a *App) Service() application.Service {
 	return a.service
+}
+
+// DevelMode reports whether the application is running with development shortcuts.
+func (a *App) DevelMode() bool {
+	return a.devel
+}
+
+func develModeEnabled() bool {
+	val := strings.ToLower(strings.TrimSpace(os.Getenv("MCM_DEVEL_MODE")))
+	return val == "1" || val == "true" || val == "yes" || val == "on"
 }

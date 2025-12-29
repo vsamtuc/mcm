@@ -46,15 +46,25 @@ type indexPageData struct {
 	TeamSummaries     []teamSummary
 }
 
+type authRegistrar interface {
+	register(mux *http.ServeMux)
+}
+
 // NewMux creates a new HTTP mux with health check endpoints and authentication routes.
 // The schemaReady function is used to determine readiness status.
 func NewMux(schemaReady func() bool, appSvc application.Service, authCfg AuthConfig) (http.Handler, error) {
 	if schemaReady == nil {
 		schemaReady = func() bool { return true }
 	}
-	authCtrl, err := newAuthController(context.Background(), authCfg)
-	if err != nil {
-		return nil, err
+	var authCtrl authRegistrar
+	if authCfg.DevMode {
+		authCtrl = newDevelAuthController(authCfg)
+	} else {
+		ctrl, err := newAuthController(context.Background(), authCfg)
+		if err != nil {
+			return nil, err
+		}
+		authCtrl = ctrl
 	}
 	mux := http.NewServeMux()
 	registerCourseRoutes(mux, appSvc)
