@@ -12,10 +12,11 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/vsamtuc/mcm/internal/course/memory"
-	pgstore "github.com/vsamtuc/mcm/internal/course/postgres"
-	"github.com/vsamtuc/mcm/internal/course/service"
-	"github.com/vsamtuc/mcm/pkg/course"
+	appservice "github.com/vsamtuc/mcm/internal/service"
+	memorystore "github.com/vsamtuc/mcm/internal/store/memory"
+	pgstore "github.com/vsamtuc/mcm/internal/store/postgres"
+	"github.com/vsamtuc/mcm/pkg/application"
+	"github.com/vsamtuc/mcm/pkg/store"
 )
 
 const (
@@ -30,13 +31,13 @@ type App struct {
 	log         *slog.Logger
 	schemaReady atomic.Bool
 	db          *sql.DB
-	courseStore course.Store
-	courseSvc   course.Service
+	persistence store.Store
+	service     application.Service
 }
 
 func New(logger *slog.Logger) *App {
-	store := memory.NewStore()
-	return &App{log: logger, courseStore: store, courseSvc: service.New(store)}
+	st := memorystore.New()
+	return &App{log: logger, persistence: st, service: appservice.New(st)}
 }
 
 func (a *App) Start(ctx context.Context) error {
@@ -55,9 +56,9 @@ func (a *App) Start(ctx context.Context) error {
 		return err
 	}
 	a.db = db
-	store := pgstore.New(db)
-	a.courseStore = store
-	a.courseSvc = service.New(store)
+	st := pgstore.New(db)
+	a.persistence = st
+	a.service = appservice.New(st)
 	a.schemaReady.Store(true)
 	// init dependencies, DB connections, etc.
 	return nil
@@ -119,7 +120,7 @@ func (a *App) SchemaReady() bool {
 	return a.schemaReady.Load()
 }
 
-// Courses exposes the backing course store for handlers.
-func (a *App) Courses() course.Service {
-	return a.courseSvc
+// Service exposes the application service for HTTP handlers.
+func (a *App) Service() application.Service {
+	return a.service
 }

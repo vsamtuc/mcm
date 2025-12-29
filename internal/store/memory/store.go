@@ -7,21 +7,23 @@ import (
 	"time"
 
 	"github.com/vsamtuc/mcm/pkg/course"
+	"github.com/vsamtuc/mcm/pkg/store"
 )
 
-// Store is an in-memory implementation of course.Store for local development.
+// Store is an in-memory implementation of store.Store for local development.
 type Store struct {
-	mu      sync.RWMutex
-	nextID  int64
-	courses map[int64]course.Course
+	mu         sync.RWMutex
+	nextID     int64
+	courses    map[int64]course.Course
+	professors map[string]int64
 }
 
-// NewStore creates an empty course store.
-func NewStore() *Store {
-	return &Store{nextID: 1, courses: make(map[int64]course.Course)}
+// New creates an empty store instance.
+func New() *Store {
+	return &Store{nextID: 1, courses: make(map[int64]course.Course), professors: make(map[string]int64)}
 }
 
-func (s *Store) List(ctx context.Context) ([]course.Course, error) {
+func (s *Store) ListCourses(ctx context.Context) ([]course.Course, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -35,7 +37,7 @@ func (s *Store) List(ctx context.Context) ([]course.Course, error) {
 	return items, nil
 }
 
-func (s *Store) Get(ctx context.Context, id int64) (course.Course, error) {
+func (s *Store) GetCourse(ctx context.Context, id int64) (course.Course, error) {
 	if err := ctx.Err(); err != nil {
 		return course.Course{}, err
 	}
@@ -48,7 +50,7 @@ func (s *Store) Get(ctx context.Context, id int64) (course.Course, error) {
 	return c, nil
 }
 
-func (s *Store) Create(ctx context.Context, input course.CreateCourseInput) (course.Course, error) {
+func (s *Store) CreateCourse(ctx context.Context, input course.CreateCourseInput) (course.Course, error) {
 	if err := course.ValidateCreate(input); err != nil {
 		return course.Course{}, err
 	}
@@ -70,7 +72,7 @@ func (s *Store) Create(ctx context.Context, input course.CreateCourseInput) (cou
 	return c, nil
 }
 
-func (s *Store) Update(ctx context.Context, id int64, input course.UpdateCourseInput) (course.Course, error) {
+func (s *Store) UpdateCourse(ctx context.Context, id int64, input course.UpdateCourseInput) (course.Course, error) {
 	if err := course.ValidateUpdate(input); err != nil {
 		return course.Course{}, err
 	}
@@ -97,7 +99,7 @@ func (s *Store) Update(ctx context.Context, id int64, input course.UpdateCourseI
 	return c, nil
 }
 
-func (s *Store) Delete(ctx context.Context, id int64) error {
+func (s *Store) DeleteCourse(ctx context.Context, id int64) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -109,3 +111,25 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 	delete(s.courses, id)
 	return nil
 }
+
+func (s *Store) FindProfessorIDBySubject(ctx context.Context, subject string) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.professors[subject]
+	if !ok {
+		return 0, course.ErrNotFound
+	}
+	return id, nil
+}
+
+// SeedProfessor registers a professor mapping for development and tests.
+func (s *Store) SeedProfessor(subject string, id int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.professors[subject] = id
+}
+
+var _ store.Store = (*Store)(nil)

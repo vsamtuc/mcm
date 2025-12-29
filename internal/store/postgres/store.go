@@ -10,9 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/vsamtuc/mcm/pkg/course"
+	"github.com/vsamtuc/mcm/pkg/store"
 )
 
-// Store persists courses inside Postgres.
+// Store persists data inside Postgres.
 type Store struct {
 	db *sql.DB
 }
@@ -25,11 +26,11 @@ func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
-var _ course.Store = (*Store)(nil)
+var _ store.Store = (*Store)(nil)
 
 const courseColumns = `id, code, title, term, created_at, updated_at`
 
-func (s *Store) List(ctx context.Context) ([]course.Course, error) {
+func (s *Store) ListCourses(ctx context.Context) ([]course.Course, error) {
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`SELECT %s FROM courses ORDER BY id`, courseColumns))
 	if err != nil {
 		return nil, err
@@ -63,7 +64,7 @@ func (s *Store) List(ctx context.Context) ([]course.Course, error) {
 	return courses, nil
 }
 
-func (s *Store) Get(ctx context.Context, id int64) (course.Course, error) {
+func (s *Store) GetCourse(ctx context.Context, id int64) (course.Course, error) {
 	row := s.db.QueryRowContext(ctx, fmt.Sprintf(`SELECT %s FROM courses WHERE id = $1`, courseColumns), id)
 	c, err := scanCourse(row)
 	if err != nil {
@@ -80,7 +81,7 @@ func (s *Store) Get(ctx context.Context, id int64) (course.Course, error) {
 	return c, nil
 }
 
-func (s *Store) Create(ctx context.Context, input course.CreateCourseInput) (course.Course, error) {
+func (s *Store) CreateCourse(ctx context.Context, input course.CreateCourseInput) (course.Course, error) {
 	if err := course.ValidateCreate(input); err != nil {
 		return course.Course{}, err
 	}
@@ -111,10 +112,10 @@ func (s *Store) Create(ctx context.Context, input course.CreateCourseInput) (cou
 		return course.Course{}, err
 	}
 
-	return s.Get(ctx, created.ID)
+	return s.GetCourse(ctx, created.ID)
 }
 
-func (s *Store) Update(ctx context.Context, id int64, input course.UpdateCourseInput) (course.Course, error) {
+func (s *Store) UpdateCourse(ctx context.Context, id int64, input course.UpdateCourseInput) (course.Course, error) {
 	if err := course.ValidateUpdate(input); err != nil {
 		return course.Course{}, err
 	}
@@ -181,10 +182,10 @@ func (s *Store) Update(ctx context.Context, id int64, input course.UpdateCourseI
 		return course.Course{}, err
 	}
 
-	return s.Get(ctx, id)
+	return s.GetCourse(ctx, id)
 }
 
-func (s *Store) Delete(ctx context.Context, id int64) error {
+func (s *Store) DeleteCourse(ctx context.Context, id int64) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM courses WHERE id = $1`, id)
 	if err != nil {
 		return err
@@ -197,6 +198,22 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 		return course.ErrNotFound
 	}
 	return nil
+}
+
+func (s *Store) FindProfessorIDBySubject(ctx context.Context, subject string) (int64, error) {
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		return 0, course.ErrNotFound
+	}
+	var id int64
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM professors WHERE keycloak_id = $1`, subject).Scan(&id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, course.ErrNotFound
+		}
+		return 0, err
+	}
+	return id, nil
 }
 
 func (s *Store) fetchInstructors(ctx context.Context, courseIDs []int64) (map[int64][]course.Instructor, error) {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vsamtuc/mcm/pkg/application"
 	"github.com/vsamtuc/mcm/pkg/auth"
 	"github.com/vsamtuc/mcm/pkg/course"
 	"github.com/vsamtuc/mcm/pkg/greet"
@@ -47,7 +48,7 @@ type indexPageData struct {
 
 // NewMux creates a new HTTP mux with health check endpoints and authentication routes.
 // The schemaReady function is used to determine readiness status.
-func NewMux(schemaReady func() bool, courseSvc course.Service, authCfg AuthConfig) (http.Handler, error) {
+func NewMux(schemaReady func() bool, appSvc application.Service, authCfg AuthConfig) (http.Handler, error) {
 	if schemaReady == nil {
 		schemaReady = func() bool { return true }
 	}
@@ -56,7 +57,7 @@ func NewMux(schemaReady func() bool, courseSvc course.Service, authCfg AuthConfi
 		return nil, err
 	}
 	mux := http.NewServeMux()
-	registerCourseRoutes(mux, courseSvc)
+	registerCourseRoutes(mux, appSvc)
 	authCtrl.register(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -183,17 +184,17 @@ func firstRune(s string) string {
 	return ""
 }
 
-func registerCourseRoutes(mux *http.ServeMux, svc course.Service) {
+func registerCourseRoutes(mux *http.ServeMux, svc application.Service) {
 	if svc == nil {
 		panic("course service is nil")
 	}
 	h := &courseHandler{service: svc}
 	mux.HandleFunc("/api/courses", h.collection)
-	mux.HandleFunc("/api/courses/", h.item)
+	mux.HandleFunc("/api/courses/", h.route)
 }
 
 type courseHandler struct {
-	service course.Service
+	service application.Service
 }
 
 func (h *courseHandler) collection(w http.ResponseWriter, r *http.Request) {
@@ -208,12 +209,43 @@ func (h *courseHandler) collection(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *courseHandler) item(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(strings.TrimPrefix(r.URL.Path, "/api/courses/"))
+func (h *courseHandler) route(w http.ResponseWriter, r *http.Request) {
+	trimmed := strings.TrimPrefix(r.URL.Path, "/api/courses/")
+	trimmed = strings.Trim(trimmed, "/")
+	if trimmed == "" {
+		writeError(w, http.StatusBadRequest, "invalid course path")
+		return
+	}
+	parts := strings.Split(trimmed, "/")
+	id, err := parseID(parts[0])
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid course id")
 		return
 	}
+	if len(parts) == 1 {
+		h.courseItem(w, r, id)
+		return
+	}
+	switch parts[1] {
+	case "instructors":
+		if len(parts) == 2 {
+			h.instructorsCollection(w, r, id)
+			return
+		}
+		if len(parts) == 3 {
+			profID, err := parseID(parts[2])
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "invalid professor id")
+				return
+			}
+			h.instructorItem(w, r, id, profID)
+			return
+		}
+	}
+	writeError(w, http.StatusNotFound, "resource not found")
+}
+
+func (h *courseHandler) courseItem(w http.ResponseWriter, r *http.Request, id int64) {
 	switch r.Method {
 	case http.MethodGet:
 		h.getCourse(w, r, id)
@@ -227,8 +259,28 @@ func (h *courseHandler) item(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *courseHandler) instructorsCollection(w http.ResponseWriter, r *http.Request, courseID int64) {
+	switch r.Method {
+	case http.MethodPost:
+		h.addCourseInstructor(w, r, courseID)
+	default:
+		w.Header().Set("Allow", http.MethodPost)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (h *courseHandler) instructorItem(w http.ResponseWriter, r *http.Request, courseID, professorID int64) {
+	switch r.Method {
+	case http.MethodDelete:
+		h.removeCourseInstructor(w, r, courseID, professorID)
+	default:
+		w.Header().Set("Allow", http.MethodDelete)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
 func (h *courseHandler) listCourses(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.List(r.Context())
+	items, err := h.service.ListCourses(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -237,7 +289,7 @@ func (h *courseHandler) listCourses(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *courseHandler) getCourse(w http.ResponseWriter, r *http.Request, id int64) {
-	item, err := h.service.Get(r.Context(), id)
+	item, err := h.service.GetCourse(r.Context(), id)
 	if err != nil {
 		handleCourseError(w, err)
 		return
@@ -253,7 +305,7 @@ func (h *courseHandler) createCourse(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON payload")
 		return
 	}
-	created, err := h.service.Create(r.Context(), input)
+	created, err := h.service.CreateCourse(r.Context(), input)
 	if err != nil {
 		handleCourseError(w, err)
 		return
@@ -269,7 +321,7 @@ func (h *courseHandler) updateCourse(w http.ResponseWriter, r *http.Request, id 
 		writeError(w, http.StatusBadRequest, "invalid JSON payload")
 		return
 	}
-	updated, err := h.service.Update(r.Context(), id, input)
+	updated, err := h.service.UpdateCourse(r.Context(), id, input)
 	if err != nil {
 		handleCourseError(w, err)
 		return
@@ -278,11 +330,44 @@ func (h *courseHandler) updateCourse(w http.ResponseWriter, r *http.Request, id 
 }
 
 func (h *courseHandler) deleteCourse(w http.ResponseWriter, r *http.Request, id int64) {
-	if err := h.service.Delete(r.Context(), id); err != nil {
+	if err := h.service.DeleteCourse(r.Context(), id); err != nil {
 		handleCourseError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusNoContent, nil)
+}
+
+type instructorPayload struct {
+	ProfessorID int64  `json:"professor_id"`
+	Role        string `json:"role"`
+}
+
+func (h *courseHandler) addCourseInstructor(w http.ResponseWriter, r *http.Request, courseID int64) {
+	var payload instructorPayload
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON payload")
+		return
+	}
+	created, err := h.service.AddCourseInstructor(r.Context(), courseID, course.Instructor{
+		ProfessorID: payload.ProfessorID,
+		Role:        payload.Role,
+	})
+	if err != nil {
+		handleCourseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, created)
+}
+
+func (h *courseHandler) removeCourseInstructor(w http.ResponseWriter, r *http.Request, courseID, professorID int64) {
+	updated, err := h.service.RemoveCourseInstructor(r.Context(), courseID, professorID)
+	if err != nil {
+		handleCourseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func parseID(raw string) (int64, error) {
@@ -299,6 +384,10 @@ func handleCourseError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusOK, nil)
 	case errors.Is(err, course.ErrNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, course.ErrUnauthenticated):
+		writeError(w, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, course.ErrForbidden):
+		writeError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		writeError(w, http.StatusRequestTimeout, err.Error())
 	default:

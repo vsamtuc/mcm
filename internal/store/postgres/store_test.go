@@ -27,7 +27,7 @@ func TestStoreCRUD(t *testing.T) {
 	profID := seedProfessor(t, db)
 	store := New(db)
 
-	created, err := store.Create(ctx, course.CreateCourseInput{
+	created, err := store.CreateCourse(ctx, course.CreateCourseInput{
 		Code:  "CSC101",
 		Title: "Distributed Systems",
 		Term:  "Fall 2025",
@@ -36,7 +36,7 @@ func TestStoreCRUD(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("Create() error = %v", err)
+		t.Fatalf("CreateCourse() error = %v", err)
 	}
 	if created.ID == 0 {
 		t.Fatalf("expected created ID to be set")
@@ -48,17 +48,17 @@ func TestStoreCRUD(t *testing.T) {
 		t.Fatalf("expected instructor to be persisted, got %+v", created.Instructors)
 	}
 
-	fetched, err := store.Get(ctx, created.ID)
+	fetched, err := store.GetCourse(ctx, created.ID)
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		t.Fatalf("GetCourse() error = %v", err)
 	}
 	if fetched.ID != created.ID || fetched.Code != created.Code {
 		t.Fatalf("fetched course mismatch: %+v vs %+v", fetched, created)
 	}
 
-	listed, err := store.List(ctx)
+	listed, err := store.ListCourses(ctx)
 	if err != nil {
-		t.Fatalf("List() error = %v", err)
+		t.Fatalf("ListCourses() error = %v", err)
 	}
 	if len(listed) != 1 {
 		t.Fatalf("expected 1 course, got %d", len(listed))
@@ -68,14 +68,14 @@ func TestStoreCRUD(t *testing.T) {
 	newTerm := "Winter 2026"
 	newCode := "CSC201"
 	newInstructors := []course.Instructor{{ProfessorID: profID, Role: "coordinator"}}
-	updated, err := store.Update(ctx, created.ID, course.UpdateCourseInput{
+	updated, err := store.UpdateCourse(ctx, created.ID, course.UpdateCourseInput{
 		Title:       &newTitle,
 		Term:        &newTerm,
 		Code:        &newCode,
 		Instructors: &newInstructors,
 	})
 	if err != nil {
-		t.Fatalf("Update() error = %v", err)
+		t.Fatalf("UpdateCourse() error = %v", err)
 	}
 	if updated.Title != newTitle || updated.Term != newTerm || updated.Code != newCode {
 		t.Fatalf("update did not apply fields: %+v", updated)
@@ -87,11 +87,37 @@ func TestStoreCRUD(t *testing.T) {
 		t.Fatalf("expected updated_at to advance: created=%v updated=%v", created.UpdatedAt, updated.UpdatedAt)
 	}
 
-	if err := store.Delete(ctx, created.ID); err != nil {
-		t.Fatalf("Delete() error = %v", err)
+	if err := store.DeleteCourse(ctx, created.ID); err != nil {
+		t.Fatalf("DeleteCourse() error = %v", err)
 	}
-	if _, err := store.Get(ctx, created.ID); !errors.Is(err, course.ErrNotFound) {
+	if _, err := store.GetCourse(ctx, created.ID); !errors.Is(err, course.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+func TestFindProfessorIDBySubject(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping postgres integration test in short mode")
+	}
+	ctx := context.Background()
+	pg := testpg.Start(ctx, t)
+	db := openDB(t, pg.ConnURI())
+	applyMigrations(t, db)
+	store := New(db)
+	subject := "00000000-0000-0000-0000-000000000042"
+	var expected int64
+	if err := db.QueryRow(`INSERT INTO professors (keycloak_id, full_name, email) VALUES ($1, 'Test Instructor', 'test@example.com') RETURNING id`, subject).Scan(&expected); err != nil {
+		t.Fatalf("insert professor: %v", err)
+	}
+	id, err := store.FindProfessorIDBySubject(ctx, subject)
+	if err != nil {
+		t.Fatalf("FindProfessorIDBySubject() error = %v", err)
+	}
+	if id != expected {
+		t.Fatalf("expected %d, got %d", expected, id)
+	}
+	if _, err := store.FindProfessorIDBySubject(ctx, "00000000-0000-0000-0000-000000000999"); !errors.Is(err, course.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for missing subject, got %v", err)
 	}
 }
 

@@ -6,7 +6,7 @@ Manage a Kubernetes cluster on behalf of multiple users.
 - Run `scripts/dev.sh` before committing; it executes `go fmt`, `go vet`, and `go test -race` across the repo.
 - `go run ./cmd/mcm` starts the API on `:8080`; hit `/hello`, `/livez`, or `/readyz` to verify handlers in `internal/transport/http`.
 - Integration tests use Testcontainers (see `internal/app/app_integration_test.go`); keep Docker running locally or pass `-short` to skip them.
-- Experimental JSON endpoints under `/api/courses` expose CRUD over the in-memory store defined in `pkg/course` + `internal/course/memory`.
+- Experimental JSON endpoints under `/api/courses` expose CRUD over the in-memory store defined in `pkg/course` + `internal/store/memory`.
 
 ## Database migrations
 - SQL migrations live in `db/migrations`; `0001_init_schema` seeds students, courses, teams, and approval tables.

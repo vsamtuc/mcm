@@ -1,7 +1,6 @@
 package course
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"time"
@@ -40,21 +39,16 @@ type UpdateCourseInput struct {
 	Instructors *[]Instructor `json:"instructors"`
 }
 
-// Store manages persistence for courses.
-type Store interface {
-	List(ctx context.Context) ([]Course, error)
-	Get(ctx context.Context, id int64) (Course, error)
-	Create(ctx context.Context, input CreateCourseInput) (Course, error)
-	Update(ctx context.Context, id int64, input UpdateCourseInput) (Course, error)
-	Delete(ctx context.Context, id int64) error
-}
-
 var (
 	errEmptyCode  = errors.New("course code cannot be empty")
 	errEmptyTitle = errors.New("course title cannot be empty")
 	errEmptyTerm  = errors.New("course term cannot be empty")
 	// ErrNotFound indicates the requested course does not exist.
 	ErrNotFound = errors.New("course not found")
+	// ErrUnauthenticated indicates no user was provided in context.
+	ErrUnauthenticated = errors.New("authentication required")
+	// ErrForbidden indicates the user lacks required permissions.
+	ErrForbidden = errors.New("insufficient permissions")
 )
 
 // ValidateCreate ensures the input has minimally acceptable data.

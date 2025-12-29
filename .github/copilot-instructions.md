@@ -8,7 +8,7 @@
 
 ## Coding Patterns
 - Project targets Go 1.25.3 (`go.mod`); use `slog` for logging and pass contexts explicitly when adding long-running work.
-- Shared, importable helpers belong under `pkg/` (see `pkg/greet` and the new `pkg/course` types + validation). Code that should remain internal to the service belongs under `internal/` (e.g., `internal/course/memory` for the dev-only store backing the `/api/courses` endpoints).
+- Shared, importable helpers belong under `pkg/` (see `pkg/greet` and the new `pkg/course` types + validation). Code that should remain internal to the service belongs under `internal/` (e.g., `internal/store/memory` for the dev-only store backing the `/api/courses` endpoints).
 - Stick with standard library HTTP primitives; no third-party router is wired today, so adding one requires updating `httpx.NewMux` and the server wiring in `main.go`.
 
 ## Local Dev & Testing

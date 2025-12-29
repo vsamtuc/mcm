@@ -44,7 +44,7 @@ func main() {
 		logger.Error("KEYCLOAK_CLIENT_ID must be set")
 		os.Exit(1)
 	}
-	handler, err := httpx.NewMux(a.SchemaReady, a.Courses(), httpx.AuthConfig{
+	handler, err := httpx.NewMux(a.SchemaReady, a.Service(), httpx.AuthConfig{
 		IssuerURL:     issuerURL,
 		BrowserURL:    browserIssuerURL,
 		ClientID:      clientID,
