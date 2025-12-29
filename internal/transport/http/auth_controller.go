@@ -13,6 +13,9 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+
+	devauth "github.com/vsamtuc/mcm/internal/auth/devel"
+	"github.com/vsamtuc/mcm/pkg/auth"
 	"golang.org/x/oauth2"
 )
 
@@ -38,6 +41,7 @@ type AuthConfig struct {
 	SessionCookie string
 	StateCookie   string
 	PKCECookie    string
+	DevMode       bool
 	// Timeout controls OAuth calls; zero uses the default.
 	Timeout time.Duration
 }
@@ -360,4 +364,126 @@ func uniqueIssuers(issuers []string) []string {
 		result = append(result, iss)
 	}
 	return result
+}
+
+type develAuthController struct {
+	sessionCookie string
+	personas      map[string]auth.User
+}
+
+func newDevelAuthController(cfg AuthConfig) *develAuthController {
+	cookie := cfg.SessionCookie
+	if cookie == "" {
+		cookie = SessionCookieName
+	}
+	return &develAuthController{sessionCookie: cookie, personas: defaultDevPersonas()}
+}
+
+func (a *develAuthController) register(mux *http.ServeMux) {
+	mux.HandleFunc(LoginPath, a.issueToken)
+	mux.HandleFunc(CallbackPath, a.issueToken)
+	mux.HandleFunc(LogoutPath, a.logout)
+}
+
+func (a *develAuthController) issueToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	user := a.userFromQuery(r.URL.Query())
+	http.SetCookie(w, &http.Cookie{
+		Name:     a.sessionCookie,
+		Value:    devauth.EncodeUser(user),
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Now().Add(12 * time.Hour),
+	})
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (a *develAuthController) logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET,POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: a.sessionCookie, Path: "/", MaxAge: -1})
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (a *develAuthController) userFromQuery(values url.Values) auth.User {
+	if persona := strings.ToLower(strings.TrimSpace(values.Get("persona"))); persona != "" {
+		if user, ok := a.personas[persona]; ok {
+			return user
+		}
+	}
+	user := auth.User{
+		Subject:  strings.TrimSpace(values.Get("sub")),
+		Username: strings.TrimSpace(values.Get("username")),
+		Email:    strings.TrimSpace(values.Get("email")),
+	}
+	roles := values.Get("roles")
+	if roles == "" {
+		roles = values.Get("role")
+	}
+	if trimmed := strings.TrimSpace(roles); trimmed != "" {
+		user.Roles = splitRoles(trimmed)
+	}
+	if len(user.Roles) == 0 {
+		user.Roles = []string{"admin"}
+	}
+	if user.Subject == "" {
+		user.Subject = "dev-admin"
+	}
+	if user.Username == "" {
+		user.Username = "Dev Admin"
+	}
+	if user.Email == "" {
+		user.Email = "dev-admin@example.com"
+	}
+	return user
+}
+
+func splitRoles(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		p := strings.TrimSpace(part)
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+func defaultDevPersonas() map[string]auth.User {
+	return map[string]auth.User{
+		"admin": {
+			Subject:  "dev-admin",
+			Username: "Dev Admin",
+			Email:    "dev-admin@example.com",
+			Roles:    []string{"admin", "professor"},
+		},
+		"professor": {
+			Subject:  "dev-prof-primary",
+			Username: "Dev Professor",
+			Email:    "professor@example.com",
+			Roles:    []string{"professor"},
+		},
+		"assistant": {
+			Subject:  "dev-prof-assistant",
+			Username: "Dev Assistant",
+			Email:    "assistant@example.com",
+			Roles:    []string{"professor"},
+		},
+		"student": {
+			Subject:  "dev-student",
+			Username: "Dev Student",
+			Email:    "student@example.com",
+			Roles:    []string{"student"},
+		},
+	}
 }
