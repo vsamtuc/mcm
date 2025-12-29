@@ -15,7 +15,7 @@
 </head>
 <body class="min-h-screen bg-base-200">
   <header class="bg-base-100 shadow-md">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between relative">
       <div class="flex items-center gap-3">
         <div class="w-11 h-11 rounded-full bg-primary text-base-100 flex items-center justify-center font-bold shadow-lg">
           {{.BrandInitials}}
@@ -43,8 +43,21 @@
                 hx-swap="innerHTML">
           ☰
         </button>
+        {{if .DevelMode}}
+          <div class="dropdown dropdown-end hidden md:block relative">
+            <div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-2">
+              <span>Persona</span>
+            </div>
+            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow-lg mt-3 w-44 z-50">
+              <li><a href="/auth/login?persona=admin">Admin</a></li>
+              <li><a href="/auth/login?persona=professor">Professor</a></li>
+              <li><a href="/auth/login?persona=assistant">Assistant</a></li>
+              <li><a href="/auth/login?persona=student">Student</a></li>
+            </ul>
+          </div>
+        {{end}}
         {{if .UserAuthenticated}}
-          <div class="dropdown dropdown-end">
+          <div class="dropdown dropdown-end relative">
             <div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-2">
               <div class="avatar placeholder">
                 <div class="bg-primary text-primary-content rounded-full w-8">
@@ -53,7 +66,7 @@
               </div>
               <span class="hidden md:inline text-sm font-semibold">{{.UserLabel}}</span>
             </div>
-            <div tabindex="0" class="dropdown-content bg-base-100 text-sm rounded-box shadow-lg mt-3 w-60 p-4 space-y-2">
+            <div tabindex="0" class="dropdown-content bg-base-100 text-sm rounded-box shadow-lg mt-3 w-60 p-4 space-y-2 z-50">
               <p class="text-xs uppercase tracking-wide text-base-content/60">Signed in</p>
               <p class="font-semibold break-all">{{.UserLabel}}</p>
               {{if .UserEmail}}
@@ -85,7 +98,13 @@
   </header>
 
   <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-    {{block "content" .}}{{end}}
+    {{if eq .ContentTemplate "courses_content"}}
+      {{template "courses_content" .}}
+    {{else if eq .ContentTemplate "enroll_content"}}
+      {{template "enroll_content" .}}
+    {{else}}
+      {{template "index_content" .}}
+    {{end}}
   </main>
 </body>
 </html>

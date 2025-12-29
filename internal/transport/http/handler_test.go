@@ -71,6 +71,111 @@ func TestAbsoluteURL(t *testing.T) {
 	}
 }
 
+func TestIndexRedirectsWhenUnauthenticated(t *testing.T) {
+	t.Parallel()
+	mux, err := NewMux(func() bool { return true }, appservice.New(memorystore.New()), AuthConfig{DevMode: true})
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	if loc := rec.Header().Get("Location"); loc != LoginPath {
+		t.Fatalf("redirect Location = %q, want %q", loc, LoginPath)
+	}
+}
+
+func TestCoursesRedirectsWhenUnauthenticated(t *testing.T) {
+	t.Parallel()
+	mux, err := NewMux(func() bool { return true }, appservice.New(memorystore.New()), AuthConfig{DevMode: true})
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/courses", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	if loc := rec.Header().Get("Location"); loc != LoginPath {
+		t.Fatalf("redirect Location = %q, want %q", loc, LoginPath)
+	}
+}
+
+func TestCoursesPageRendersWithUser(t *testing.T) {
+	t.Parallel()
+	mux, err := NewMux(func() bool { return true }, appservice.New(memorystore.New()), AuthConfig{DevMode: true})
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/courses", nil)
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Subject: "dev", Roles: []string{"admin"}}))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "Create course") {
+		t.Fatalf("response missing form content")
+	}
+}
+
+func TestCoursesRedirectsStudentToEnroll(t *testing.T) {
+	t.Parallel()
+	mux, err := NewMux(func() bool { return true }, appservice.New(memorystore.New()), AuthConfig{DevMode: true})
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/courses", nil)
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Subject: "dev-student", Roles: []string{"student"}}))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	if loc := rec.Header().Get("Location"); loc != "/enroll" {
+		t.Fatalf("redirect Location = %q, want %q", loc, "/enroll")
+	}
+}
+
+func TestEnrollPageRendersForStudent(t *testing.T) {
+	t.Parallel()
+	mux, err := NewMux(func() bool { return true }, appservice.New(memorystore.New()), AuthConfig{DevMode: true})
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/enroll", nil)
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Subject: "dev-student", Roles: []string{"student"}}))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "Enroll in courses") {
+		t.Fatalf("response missing enrollment content")
+	}
+}
+
+func TestCoursesTrailingSlashRedirects(t *testing.T) {
+	t.Parallel()
+	mux, err := NewMux(func() bool { return true }, appservice.New(memorystore.New()), AuthConfig{DevMode: true})
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/courses/", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMovedPermanently {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMovedPermanently)
+	}
+	if loc := rec.Header().Get("Location"); loc != "/courses" {
+		t.Fatalf("redirect Location = %q, want %q", loc, "/courses")
+	}
+}
+
 func TestCourseHandlerCreateCourseRequiresAuth(t *testing.T) {
 	t.Parallel()
 	h, _ := newTestCourseHandler()

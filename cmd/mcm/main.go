@@ -110,7 +110,7 @@ func main() {
 }
 
 func withAuthMiddleware(next http.Handler, issuerURL, browserIssuerURL, clientID string) (http.Handler, error) {
-	skipPaths := []string{"/", httpx.LoginPath, httpx.LogoutPath, httpx.CallbackPath, "/livez", "/readyz"}
+	skipPaths := []string{"/", "/courses", httpx.LoginPath, httpx.LogoutPath, httpx.CallbackPath, "/livez", "/readyz"}
 	skipPaths = append(skipPaths, additionalSkipPaths()...)
 	mw, err := authjwt.New(context.Background(), authjwt.Config{
 		IssuerURL:        issuerURL,

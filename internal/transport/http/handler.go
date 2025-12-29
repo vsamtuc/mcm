@@ -17,11 +17,12 @@ import (
 )
 
 type navLink struct {
-	Label    string
-	Href     string
-	HxGet    string
-	HxTarget string
-	HxSwap   string
+	Label        string
+	Href         string
+	HxGet        string
+	HxTarget     string
+	HxSwap       string
+	AllowedRoles []string
 }
 
 type teamSummary struct {
@@ -43,11 +44,48 @@ type indexPageData struct {
 	ActivityEndpoint  string
 	AuthLoginURL      string
 	AuthLogoutURL     string
+	ContentTemplate   string
+	DevelMode         bool
 	TeamSummaries     []teamSummary
 }
 
 type authRegistrar interface {
 	register(mux *http.ServeMux)
+}
+
+func buildMenu(user *auth.User) []navLink {
+	links := []navLink{
+		{Label: "Dashboard", Href: "/"},
+		{Label: "Courses", Href: "/courses", AllowedRoles: []string{"professor"}},
+		{Label: "Enroll", Href: "/enroll", AllowedRoles: []string{"student"}},
+		{Label: "Teams", Href: "#teams"},
+		{Label: "Approvals", Href: "#approvals"},
+	}
+	visible := make([]navLink, 0, len(links))
+	for _, link := range links {
+		if linkVisible(link, user) {
+			visible = append(visible, link)
+		}
+	}
+	return visible
+}
+
+func linkVisible(link navLink, user *auth.User) bool {
+	if len(link.AllowedRoles) == 0 {
+		return true
+	}
+	if user == nil {
+		return false
+	}
+	if isAdmin(*user) {
+		return true
+	}
+	for _, role := range link.AllowedRoles {
+		if userHasRole(*user, role) {
+			return true
+		}
+	}
+	return false
 }
 
 // NewMux creates a new HTTP mux with health check endpoints and authentication routes.
@@ -69,17 +107,27 @@ func NewMux(schemaReady func() bool, appSvc application.Service, authCfg AuthCon
 	mux := http.NewServeMux()
 	registerCourseRoutes(mux, appSvc)
 	authCtrl.register(mux)
+	devMode := authCfg.DevMode
+	uiCourses := &coursePageHandler{service: appSvc, devel: devMode}
+	uiEnroll := &enrollPageHandler{service: appSvc, devel: devMode}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
-		data := defaultIndexPageData()
+		if _, ok := auth.UserFrom(r.Context()); !ok {
+			http.Redirect(w, r, LoginPath, http.StatusFound)
+			return
+		}
+		data := defaultIndexPageData(devMode)
 		if user, ok := auth.UserFrom(r.Context()); ok {
 			applyUserToIndex(&data, user)
 		}
 		renderTemplate(w, "index", data)
 	})
+	mux.HandleFunc("/courses", uiCourses.handleRoot)
+	mux.HandleFunc("/courses/", uiCourses.handleRoutes)
+	mux.HandleFunc("/enroll", uiEnroll.handleRoot)
 	mux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -111,7 +159,7 @@ func NewMux(schemaReady func() bool, appSvc application.Service, authCfg AuthCon
 	return mux, nil
 }
 
-func defaultIndexPageData() indexPageData {
+func defaultIndexPageData(devMode bool) indexPageData {
 	return indexPageData{
 		Title:            "Multiuser Cluster Manager",
 		BrandName:        "MCM",
@@ -120,13 +168,10 @@ func defaultIndexPageData() indexPageData {
 		UserLabel:        "Sign in",
 		AuthLoginURL:     LoginPath,
 		AuthLogoutURL:    LogoutPath,
+		ContentTemplate:  "index_content",
+		DevelMode:        devMode,
 		ActivityEndpoint: "/ui/activity",
-		Menu: []navLink{
-			{Label: "Dashboard", Href: "/"},
-			{Label: "Courses", Href: "#courses"},
-			{Label: "Teams", Href: "#teams"},
-			{Label: "Approvals", Href: "#approvals"},
-		},
+		Menu:             buildMenu(nil),
 		TeamSummaries: []teamSummary{
 			{Course: "CSC 482", Ready: "11", Pending: "2"},
 			{Course: "CS 544", Ready: "9", Pending: "5"},
@@ -143,6 +188,7 @@ func applyUserToIndex(data *indexPageData, user auth.User) {
 	data.UserLabel = userDisplayName(user)
 	data.UserEmail = user.Email
 	data.UserAvatar = userInitials(user)
+	data.Menu = buildMenu(&user)
 }
 
 func userDisplayName(user auth.User) string {
@@ -187,6 +233,27 @@ func userInitials(user auth.User) string {
 	return strings.ToUpper(first + second)
 }
 
+func userHasRole(user auth.User, role string) bool {
+	for _, r := range user.Roles {
+		if strings.EqualFold(r, role) {
+			return true
+		}
+	}
+	return false
+}
+
+func isAdmin(user auth.User) bool {
+	return userHasRole(user, "admin")
+}
+
+func isProfessor(user auth.User) bool {
+	return isAdmin(user) || userHasRole(user, "professor")
+}
+
+func isStudent(user auth.User) bool {
+	return isAdmin(user) || userHasRole(user, "student")
+}
+
 func firstRune(s string) string {
 	for _, r := range s {
 		return string(r)
@@ -201,6 +268,193 @@ func registerCourseRoutes(mux *http.ServeMux, svc application.Service) {
 	h := &courseHandler{service: svc}
 	mux.HandleFunc("/api/courses", h.collection)
 	mux.HandleFunc("/api/courses/", h.route)
+}
+
+type coursePageHandler struct {
+	service application.Service
+	devel   bool
+}
+
+type enrollPageHandler struct {
+	service application.Service
+	devel   bool
+}
+
+type coursesPageData struct {
+	indexPageData
+	Courses []course.Course
+	Error   string
+}
+
+func (h *enrollPageHandler) handleRoot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/enroll" {
+		http.NotFound(w, r)
+		return
+	}
+	user, ok := auth.UserFrom(r.Context())
+	if !ok {
+		http.Redirect(w, r, LoginPath, http.StatusFound)
+		return
+	}
+	if isProfessor(user) {
+		http.Redirect(w, r, "/courses", http.StatusFound)
+		return
+	}
+	if !isStudent(user) {
+		writeError(w, http.StatusForbidden, "insufficient role")
+		return
+	}
+	data := defaultIndexPageData(h.devel)
+	data.Title = "Enroll in courses"
+	data.ContentTemplate = "enroll_content"
+	applyUserToIndex(&data, user)
+	renderTemplate(w, "enroll", data)
+}
+
+func (h *coursePageHandler) handleRoot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/courses" && r.URL.Path != "/courses/" {
+		h.handleRoutes(w, r)
+		return
+	}
+	user, ok := auth.UserFrom(r.Context())
+	if !ok {
+		http.Redirect(w, r, LoginPath, http.StatusFound)
+		return
+	}
+	if !isProfessor(user) {
+		http.Redirect(w, r, "/enroll", http.StatusFound)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		h.renderCourses(w, r, "")
+	case http.MethodPost:
+		h.createCourse(w, r)
+	default:
+		w.Header().Set("Allow", "GET,POST")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (h *coursePageHandler) handleRoutes(w http.ResponseWriter, r *http.Request) {
+	trimmed := strings.TrimPrefix(r.URL.Path, "/courses/")
+	trimmed = strings.Trim(trimmed, "/")
+	if trimmed == "" {
+		http.Redirect(w, r, "/courses", http.StatusMovedPermanently)
+		return
+	}
+	user, ok := auth.UserFrom(r.Context())
+	if !ok {
+		http.Redirect(w, r, LoginPath, http.StatusFound)
+		return
+	}
+	if !isProfessor(user) {
+		http.Redirect(w, r, "/enroll", http.StatusFound)
+		return
+	}
+	parts := strings.Split(trimmed, "/")
+	if len(parts) < 2 || parts[1] != "instructors" {
+		http.NotFound(w, r)
+		return
+	}
+	courseID, err := parseID(parts[0])
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid course id")
+		return
+	}
+	if len(parts) == 2 && r.Method == http.MethodPost {
+		h.addInstructor(w, r, courseID)
+		return
+	}
+	if len(parts) == 4 && parts[3] == "remove" && r.Method == http.MethodPost {
+		profID, err := parseID(parts[2])
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid professor id")
+			return
+		}
+		h.removeInstructor(w, r, courseID, profID)
+		return
+	}
+	http.NotFound(w, r)
+}
+
+func (h *coursePageHandler) createCourse(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFrom(r.Context())
+	if !ok {
+		http.Redirect(w, r, LoginPath, http.StatusFound)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		h.renderCourses(w, r, "invalid form data")
+		return
+	}
+	input := course.CreateCourseInput{
+		Code:  strings.TrimSpace(r.FormValue("code")),
+		Title: strings.TrimSpace(r.FormValue("title")),
+		Term:  strings.TrimSpace(r.FormValue("term")),
+	}
+	ctx := auth.WithUser(r.Context(), user)
+	if _, err := h.service.CreateCourse(ctx, input); err != nil {
+		h.renderCourses(w, r, err.Error())
+		return
+	}
+	http.Redirect(w, r, "/courses", http.StatusFound)
+}
+
+func (h *coursePageHandler) addInstructor(w http.ResponseWriter, r *http.Request, courseID int64) {
+	user, ok := auth.UserFrom(r.Context())
+	if !ok {
+		http.Redirect(w, r, LoginPath, http.StatusFound)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		h.renderCourses(w, r, "invalid form data")
+		return
+	}
+	profID, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("professor_id")), 10, 64)
+	if err != nil || profID <= 0 {
+		h.renderCourses(w, r, "invalid professor id")
+		return
+	}
+	role := strings.TrimSpace(r.FormValue("role"))
+	ctx := auth.WithUser(r.Context(), user)
+	if _, err := h.service.AddCourseInstructor(ctx, courseID, course.Instructor{ProfessorID: profID, Role: role}); err != nil {
+		h.renderCourses(w, r, err.Error())
+		return
+	}
+	http.Redirect(w, r, "/courses", http.StatusFound)
+}
+
+func (h *coursePageHandler) removeInstructor(w http.ResponseWriter, r *http.Request, courseID, professorID int64) {
+	user, ok := auth.UserFrom(r.Context())
+	if !ok {
+		http.Redirect(w, r, LoginPath, http.StatusFound)
+		return
+	}
+	ctx := auth.WithUser(r.Context(), user)
+	if _, err := h.service.RemoveCourseInstructor(ctx, courseID, professorID); err != nil {
+		h.renderCourses(w, r, err.Error())
+		return
+	}
+	http.Redirect(w, r, "/courses", http.StatusFound)
+}
+
+func (h *coursePageHandler) renderCourses(w http.ResponseWriter, r *http.Request, errMsg string) {
+	user, ok := auth.UserFrom(r.Context())
+	if !ok {
+		http.Redirect(w, r, LoginPath, http.StatusFound)
+		return
+	}
+	ctx := auth.WithUser(r.Context(), user)
+	courses, err := h.service.ListCourses(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	data := coursesPageData{indexPageData: defaultIndexPageData(h.devel), Courses: courses, Error: errMsg}
+	data.ContentTemplate = "courses_content"
+	applyUserToIndex(&data.indexPageData, user)
+	renderTemplate(w, "courses", data)
 }
 
 type courseHandler struct {

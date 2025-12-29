@@ -1,0 +1,22 @@
+{{define "enroll"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "enroll_content"}}
+<section class="space-y-6">
+  <header class="flex items-center justify-between gap-4">
+    <div>
+      <p class="text-sm text-base-content/60">Student enrollment</p>
+      <h1 class="text-2xl font-semibold">Enroll in courses</h1>
+    </div>
+    <a class="btn btn-ghost" href="/">Back to dashboard</a>
+  </header>
+
+  <div class="card bg-base-100 shadow-xl">
+    <div class="card-body space-y-3">
+      <h2 class="card-title">Enrollment coming soon</h2>
+      <p class="text-base-content/70">You will be able to browse available courses and request enrollment from this page.</p>
+    </div>
+  </div>
+</section>
+{{end}}
