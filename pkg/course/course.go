@@ -12,6 +12,7 @@ type Course struct {
 	Code        string       `json:"code"`
 	Title       string       `json:"title"`
 	Term        string       `json:"term"`
+	Active      bool         `json:"active"`
 	Instructors []Instructor `json:"instructors"`
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`

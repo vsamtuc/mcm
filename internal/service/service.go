@@ -29,6 +29,14 @@ func (s *Service) ListCourses(ctx context.Context) ([]course.Course, error) {
 	return s.store.ListCourses(ctx)
 }
 
+func (s *Service) ListProfessors(ctx context.Context) ([]course.Professor, error) {
+	return s.store.ListProfessors(ctx)
+}
+
+func (s *Service) ProfessorCourses(ctx context.Context, professorID int64) ([]course.Course, error) {
+	return s.store.ProfessorCourses(ctx, professorID)
+}
+
 func (s *Service) GetCourse(ctx context.Context, id int64) (course.Course, error) {
 	return s.store.GetCourse(ctx, id)
 }
@@ -50,6 +58,20 @@ func (s *Service) UpdateCourse(ctx context.Context, id int64, input course.Updat
 
 func (s *Service) DeleteCourse(ctx context.Context, id int64) error {
 	return s.store.DeleteCourse(ctx, id)
+}
+
+func (s *Service) SetCourseActive(ctx context.Context, id int64) (course.Course, error) {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return course.Course{}, err
+	}
+	return s.store.UpdateCourseActive(ctx, id, true)
+}
+
+func (s *Service) SetCourseInactive(ctx context.Context, id int64) (course.Course, error) {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return course.Course{}, err
+	}
+	return s.store.UpdateCourseActive(ctx, id, false)
 }
 
 func (s *Service) AddCourseInstructor(ctx context.Context, courseID int64, instructor course.Instructor) (course.Course, error) {
@@ -115,6 +137,17 @@ func (s *Service) ensureInstructorAccess(ctx context.Context, cr course.Course) 
 	return nil
 }
 
+func (s *Service) requireInstructorOrAdmin(ctx context.Context) error {
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return course.ErrUnauthenticated
+	}
+	if user.HasAnyRole("admin", "professor") {
+		return nil
+	}
+	return course.ErrForbidden
+}
+
 func isPrimaryInstructor(instructors []course.Instructor, professorID int64) bool {
 	for _, inst := range instructors {
 		if inst.ProfessorID == professorID && strings.EqualFold(strings.TrimSpace(inst.Role), "primary") {
@@ -155,6 +188,73 @@ func normalizeInstructorRole(role string) string {
 		return "primary"
 	}
 	return trimmed
+}
+
+func (s *Service) ListStudents(ctx context.Context) ([]course.Student, error) {
+	return s.store.ListStudents(ctx)
+}
+
+func (s *Service) StudentCourses(ctx context.Context, studentID int64) ([]course.Course, error) {
+	return s.store.StudentCourses(ctx, studentID)
+}
+
+func (s *Service) EnrollStudentInCourse(ctx context.Context, courseID int64, studentID int64) (course.Course, error) {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return course.Course{}, err
+	}
+	if err := s.store.EnrollStudent(ctx, courseID, studentID); err != nil {
+		return course.Course{}, err
+	}
+	return s.store.GetCourse(ctx, courseID)
+}
+
+func (s *Service) UnenrollStudentFromCourse(ctx context.Context, courseID int64, studentID int64) (course.Course, error) {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return course.Course{}, err
+	}
+	if err := s.store.UnenrollStudent(ctx, courseID, studentID); err != nil {
+		return course.Course{}, err
+	}
+	return s.store.GetCourse(ctx, courseID)
+}
+
+func (s *Service) ListTeams(ctx context.Context, courseID int64) ([]course.Team, error) {
+	return s.store.ListTeams(ctx, courseID)
+}
+
+func (s *Service) CreateTeam(ctx context.Context, input course.CreateTeamInput) (course.Team, error) {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return course.Team{}, err
+	}
+	return s.store.CreateTeam(ctx, input)
+}
+
+func (s *Service) UpdateTeam(ctx context.Context, teamID int64, input course.UpdateTeamInput) (course.Team, error) {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return course.Team{}, err
+	}
+	return s.store.UpdateTeam(ctx, teamID, input)
+}
+
+func (s *Service) DeleteTeam(ctx context.Context, teamID int64) error {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return err
+	}
+	return s.store.DeleteTeam(ctx, teamID)
+}
+
+func (s *Service) TeamAddMember(ctx context.Context, teamID int64, studentID int64) (course.Team, error) {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return course.Team{}, err
+	}
+	return s.store.AddTeamMember(ctx, teamID, studentID)
+}
+
+func (s *Service) TeamRemoveMember(ctx context.Context, teamID int64, studentID int64) (course.Team, error) {
+	if err := s.requireInstructorOrAdmin(ctx); err != nil {
+		return course.Team{}, err
+	}
+	return s.store.RemoveTeamMember(ctx, teamID, studentID)
 }
 
 var _ application.Service = (*Service)(nil)

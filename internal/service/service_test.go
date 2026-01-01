@@ -148,6 +148,18 @@ func (s *stubStore) ListCourses(ctx context.Context) ([]course.Course, error) {
 	return nil, nil
 }
 
+func (s *stubStore) UpdateCourseActive(ctx context.Context, id int64, active bool) (course.Course, error) {
+	return course.Course{}, nil
+}
+
+func (s *stubStore) ListProfessors(ctx context.Context) ([]course.Professor, error) {
+	return nil, nil
+}
+
+func (s *stubStore) ProfessorCourses(ctx context.Context, professorID int64) ([]course.Course, error) {
+	return nil, nil
+}
+
 func (s *stubStore) GetCourse(ctx context.Context, id int64) (course.Course, error) {
 	return course.Course{}, course.ErrNotFound
 }
@@ -167,4 +179,44 @@ func (s *stubStore) DeleteCourse(ctx context.Context, id int64) error {
 
 func (s *stubStore) FindProfessorIDBySubject(ctx context.Context, subject string) (int64, error) {
 	return 0, course.ErrNotFound
+}
+
+func (s *stubStore) ListStudents(ctx context.Context) ([]course.Student, error) {
+	return nil, nil
+}
+
+func (s *stubStore) StudentCourses(ctx context.Context, studentID int64) ([]course.Course, error) {
+	return nil, nil
+}
+
+func (s *stubStore) EnrollStudent(ctx context.Context, courseID int64, studentID int64) error {
+	return nil
+}
+
+func (s *stubStore) UnenrollStudent(ctx context.Context, courseID int64, studentID int64) error {
+	return nil
+}
+
+func (s *stubStore) ListTeams(ctx context.Context, courseID int64) ([]course.Team, error) {
+	return nil, nil
+}
+
+func (s *stubStore) CreateTeam(ctx context.Context, input course.CreateTeamInput) (course.Team, error) {
+	return course.Team{}, nil
+}
+
+func (s *stubStore) UpdateTeam(ctx context.Context, teamID int64, input course.UpdateTeamInput) (course.Team, error) {
+	return course.Team{}, nil
+}
+
+func (s *stubStore) DeleteTeam(ctx context.Context, teamID int64) error {
+	return nil
+}
+
+func (s *stubStore) AddTeamMember(ctx context.Context, teamID int64, studentID int64) (course.Team, error) {
+	return course.Team{}, nil
+}
+
+func (s *stubStore) RemoveTeamMember(ctx context.Context, teamID int64, studentID int64) (course.Team, error) {
+	return course.Team{}, nil
 }

@@ -3,17 +3,15 @@
 CREATE TABLE professors (
     id              BIGSERIAL PRIMARY KEY,
     keycloak_id     UUID NOT NULL UNIQUE,
-    full_name       TEXT NOT NULL,
-    email           TEXT NOT NULL UNIQUE,
+    username       TEXT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE students (
     id              BIGSERIAL PRIMARY KEY,
     keycloak_id     UUID NOT NULL UNIQUE,
-    university_id   VARCHAR(32) NOT NULL UNIQUE,
-    full_name       TEXT NOT NULL,
-    email           TEXT NOT NULL UNIQUE,
+    university_id   VARCHAR(32) UNIQUE,
+    username        TEXT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -22,12 +20,13 @@ CREATE TABLE courses (
     code              VARCHAR(16) NOT NULL UNIQUE,
     title             TEXT NOT NULL,
     term              VARCHAR(16) NOT NULL,
+    active            BOOLEAN NOT NULL DEFAULT TRUE,
     max_team_size     INTEGER NOT NULL DEFAULT 4,
     add_drop_deadline TIMESTAMPTZ NOT NULL,
     team_lock_date    TIMESTAMPTZ NOT NULL,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (max_team_size >= 1),
+    CHECK (max_team_size >= 0),
     CHECK (team_lock_date >= add_drop_deadline)
 );
 
@@ -53,8 +52,10 @@ CREATE TABLE teams (
     id            BIGSERIAL PRIMARY KEY,
     course_id     BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     name          TEXT NOT NULL,
-    formed_by_id  BIGINT NOT NULL REFERENCES students(id) ON DELETE RESTRICT,
+
+    -- One of 'pending', 'active', 'disbanded'
     status        VARCHAR(16) NOT NULL DEFAULT 'pending',
+
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (course_id, name)
 );
@@ -63,11 +64,7 @@ CREATE TABLE team_memberships (
     id                 BIGSERIAL PRIMARY KEY,
     team_id            BIGINT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
     student_id         BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-    added_by_id        BIGINT NOT NULL REFERENCES students(id) ON DELETE RESTRICT,
     added_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    requires_approval  BOOLEAN NOT NULL DEFAULT FALSE,
-    approved_by_id     BIGINT REFERENCES professors(id) ON DELETE SET NULL,
-    approved_at        TIMESTAMPTZ,
     UNIQUE (team_id, student_id)
 );
 

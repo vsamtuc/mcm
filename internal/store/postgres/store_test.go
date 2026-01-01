@@ -32,7 +32,7 @@ func TestStoreCRUD(t *testing.T) {
 		Title: "Distributed Systems",
 		Term:  "Fall 2025",
 		Instructors: []course.Instructor{
-			{ProfessorID: profID, Role: "lead"},
+			{ProfessorID: profID, Role: "primary"},
 		},
 	})
 	if err != nil {
@@ -106,7 +106,7 @@ func TestFindProfessorIDBySubject(t *testing.T) {
 	store := New(db)
 	subject := "00000000-0000-0000-0000-000000000042"
 	var expected int64
-	if err := db.QueryRow(`INSERT INTO professors (keycloak_id, full_name, email) VALUES ($1, 'Test Instructor', 'test@example.com') RETURNING id`, subject).Scan(&expected); err != nil {
+	if err := db.QueryRow(`INSERT INTO professors (keycloak_id, username) VALUES ($1, 'Test Instructor') RETURNING id`, subject).Scan(&expected); err != nil {
 		t.Fatalf("insert professor: %v", err)
 	}
 	id, err := store.FindProfessorIDBySubject(ctx, subject)
@@ -152,7 +152,7 @@ func seedProfessor(t *testing.T, db *sql.DB) int64 {
 	t.Helper()
 	var id int64
 	err := db.QueryRow(
-		`INSERT INTO professors (keycloak_id, full_name, email) VALUES ('00000000-0000-0000-0000-000000000001', 'Ada Lovelace', 'ada@example.com') RETURNING id`,
+		`INSERT INTO professors (keycloak_id, username) VALUES ('00000000-0000-0000-0000-000000000001', 'Ada Lovelace') RETURNING id`,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("insert professor: %v", err)
