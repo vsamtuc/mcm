@@ -25,22 +25,56 @@ func New(store store.Store) *Service {
 	return &Service{store: store}
 }
 
+// Return error if current user is not an admin.
+func requireAdmin(ctx context.Context) error {
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return course.ErrUnauthenticated
+	}
+	if !user.HasRole("admin") {
+		return course.ErrForbidden
+	}
+	return nil
+}
+
+// Return a list of all courses. Any authenticated user can call this.
 func (s *Service) ListCourses(ctx context.Context) ([]course.Course, error) {
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return nil, course.ErrUnauthenticated
+	}
+	_ = user // currently not used, but may be in future for filtering
 	return s.store.ListCourses(ctx)
 }
 
+// Return a list of all Professors. Requires admin role.
 func (s *Service) ListProfessors(ctx context.Context) ([]course.Professor, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
 	return s.store.ListProfessors(ctx)
 }
 
+// Return the courses instructed by the given professor. Requires admin role, or
+// professor themselves.
 func (s *Service) ProfessorCourses(ctx context.Context, professorID int64) ([]course.Course, error) {
+	if err := requreAdminOrProfessorSelf(ctx, s.store, professorID); err != nil {
+		return nil, err
+	}
 	return s.store.ProfessorCourses(ctx, professorID)
 }
 
+// GetCourse retrieves a course by its ID. Any authenticated user can call this.
 func (s *Service) GetCourse(ctx context.Context, id int64) (course.Course, error) {
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return course.Course{}, course.ErrUnauthenticated
+	}
+	_ = user // currently not used, but may be in future for filtering
 	return s.store.GetCourse(ctx, id)
 }
 
+// CreateCourse creates a new course. Requires admin or professor role.
 func (s *Service) CreateCourse(ctx context.Context, input course.CreateCourseInput) (course.Course, error) {
 	user, ok := auth.UserFrom(ctx)
 	if !ok {
@@ -56,7 +90,16 @@ func (s *Service) UpdateCourse(ctx context.Context, id int64, input course.Updat
 	return s.store.UpdateCourse(ctx, id, input)
 }
 
+// DeleteCourse deletes a course by its ID. Requires admin.
 func (s *Service) DeleteCourse(ctx context.Context, id int64) error {
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return course.ErrUnauthenticated
+	}
+	if !user.HasRole("admin") {
+		return course.ErrForbidden
+	}
+	// For later: check for resources; TODO: cascade delete?
 	return s.store.DeleteCourse(ctx, id)
 }
 
@@ -164,6 +207,29 @@ func cloneInstructors(in []course.Instructor) []course.Instructor {
 	out := make([]course.Instructor, len(in))
 	copy(out, in)
 	return out
+}
+
+func requreAdminOrProfessorSelf(ctx context.Context, st store.Store, professorID int64) error {
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return course.ErrUnauthenticated
+	}
+	if !user.HasRole("admin") {
+		if strings.TrimSpace(user.Subject) == "" {
+			return course.ErrForbidden
+		}
+		profID, err := st.FindProfessorIDBySubject(ctx, user.Subject)
+		if err != nil {
+			if errors.Is(err, course.ErrNotFound) {
+				return course.ErrForbidden
+			}
+			return err
+		}
+		if profID != professorID {
+			return course.ErrForbidden
+		}
+	}
+	return nil
 }
 
 func removeInstructorByID(in []course.Instructor, professorID int64) ([]course.Instructor, bool) {

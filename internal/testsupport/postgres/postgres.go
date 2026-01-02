@@ -24,7 +24,8 @@ type Instance struct {
 func Start(ctx context.Context, t *testing.T) *Instance {
 	t.Helper()
 
-	t.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+	// Let Ryuk run by default
+	// t.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 	containerCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 

@@ -1,5 +1,3 @@
-
-
 CREATE TABLE professors (
     id              BIGSERIAL PRIMARY KEY,
     keycloak_id     UUID NOT NULL UNIQUE,
@@ -80,6 +78,39 @@ CREATE TABLE team_change_requests (
     decision_note    TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE resource_classes (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    version TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE resource_sets (
+    id BIGSERIAL PRIMARY KEY,
+    course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    resource_class_id BIGINT NOT NULL REFERENCES resource_classes(id),
+    owner_type TEXT NOT NULL,
+    spec JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX resource_sets_course_id_idx ON resource_sets (course_id);
+CREATE INDEX resource_sets_class_id_idx ON resource_sets (resource_class_id);
+
+CREATE TABLE resources (
+    id BIGSERIAL PRIMARY KEY,
+    resource_set_id BIGINT NOT NULL REFERENCES resource_sets(id) ON DELETE CASCADE,
+    resource_class_id BIGINT NOT NULL REFERENCES resource_classes(id),
+    spec JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX resources_set_id_idx ON resources (resource_set_id);
 
 CREATE INDEX idx_course_enrollments_course ON course_enrollments(course_id);
 CREATE INDEX idx_course_enrollments_student ON course_enrollments(student_id);

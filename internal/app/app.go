@@ -93,7 +93,9 @@ func (a *App) Stop(ctx context.Context) error {
 	}
 }
 
-// ensureSchema inspects schema_migrations and verifies the deployed version matches expectations.
+// Inspects schema_migrations and verifies the
+// deployed version matches expectations. The expected version is defined
+// by expectedSchemaVersion constant.
 func (a *App) ensureSchema(parent context.Context, db *sql.DB) error {
 	if db == nil {
 		return errors.New("database handle is nil")

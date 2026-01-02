@@ -6,3 +6,6 @@ DROP TABLE IF EXISTS course_instructors;
 DROP TABLE IF EXISTS courses;
 DROP TABLE IF EXISTS students;
 DROP TABLE IF EXISTS professors;
+DROP TABLE IF EXISTS resources;
+DROP TABLE IF EXISTS resource_sets;
+DROP TABLE IF EXISTS resource_classes;

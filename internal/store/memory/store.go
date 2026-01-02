@@ -28,7 +28,7 @@ type Store struct {
 	teamMembers       map[int64]map[int64]struct{}
 }
 
-// New creates an empty store instance.
+// New creates an empty memory store instance.
 func New() *Store {
 	return &Store{
 		nextCourseID:      1,
