@@ -10,12 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/vsamtuc/mcm/pkg/course"
+	"github.com/vsamtuc/mcm/pkg/resource"
 	"github.com/vsamtuc/mcm/pkg/store"
 )
 
 // Store persists data inside Postgres.
 type Store struct {
-	db *sql.DB
+	db        *sql.DB
+	resources *ResourceStore
 }
 
 // New creates a Store backed by the provided database handle.
@@ -23,7 +25,7 @@ func New(db *sql.DB) *Store {
 	if db == nil {
 		panic("postgres store requires a db handle")
 	}
-	return &Store{db: db}
+	return &Store{db: db, resources: NewResourceStore(db)}
 }
 
 var _ store.Store = (*Store)(nil)
@@ -436,6 +438,72 @@ func (s *Store) RemoveTeamMember(ctx context.Context, teamID int64, studentID in
 		return course.Team{}, course.ErrNotFound
 	}
 	return s.fetchTeam(ctx, teamID)
+}
+
+// Resource store delegation
+
+func (s *Store) CreateResourceClass(ctx context.Context, rc resource.ResourceClass) (resource.ResourceClass, error) {
+	return s.resources.CreateResourceClass(ctx, rc)
+}
+
+func (s *Store) GetResourceClass(ctx context.Context, id int64) (resource.ResourceClass, error) {
+	return s.resources.GetResourceClass(ctx, id)
+}
+
+func (s *Store) ListResourceClasses(ctx context.Context) ([]resource.ResourceClass, error) {
+	return s.resources.ListResourceClasses(ctx)
+}
+
+func (s *Store) UpdateResourceClass(ctx context.Context, rc resource.ResourceClass) error {
+	return s.resources.UpdateResourceClass(ctx, rc)
+}
+
+func (s *Store) DeleteResourceClass(ctx context.Context, id int64) error {
+	return s.resources.DeleteResourceClass(ctx, id)
+}
+
+func (s *Store) CreateResourceSet(ctx context.Context, rs resource.ResourceSet) (resource.ResourceSet, error) {
+	return s.resources.CreateResourceSet(ctx, rs)
+}
+
+func (s *Store) GetResourceSet(ctx context.Context, id int64) (resource.ResourceSet, error) {
+	return s.resources.GetResourceSet(ctx, id)
+}
+
+func (s *Store) ListResourceSetsByCourse(ctx context.Context, courseID int64) ([]resource.ResourceSet, error) {
+	return s.resources.ListResourceSetsByCourse(ctx, courseID)
+}
+
+func (s *Store) ListResourceSetsByClass(ctx context.Context, resourceClassID int64) ([]resource.ResourceSet, error) {
+	return s.resources.ListResourceSetsByClass(ctx, resourceClassID)
+}
+
+func (s *Store) UpdateResourceSet(ctx context.Context, rs resource.ResourceSet) error {
+	return s.resources.UpdateResourceSet(ctx, rs)
+}
+
+func (s *Store) DeleteResourceSet(ctx context.Context, id int64) error {
+	return s.resources.DeleteResourceSet(ctx, id)
+}
+
+func (s *Store) CreateResource(ctx context.Context, r resource.Resource) (resource.Resource, error) {
+	return s.resources.CreateResource(ctx, r)
+}
+
+func (s *Store) GetResource(ctx context.Context, id int64) (resource.Resource, error) {
+	return s.resources.GetResource(ctx, id)
+}
+
+func (s *Store) ListResourcesBySet(ctx context.Context, resourceSetID int64) ([]resource.Resource, error) {
+	return s.resources.ListResourcesBySet(ctx, resourceSetID)
+}
+
+func (s *Store) UpdateResource(ctx context.Context, r resource.Resource) error {
+	return s.resources.UpdateResource(ctx, r)
+}
+
+func (s *Store) DeleteResource(ctx context.Context, id int64) error {
+	return s.resources.DeleteResource(ctx, id)
 }
 
 func (s *Store) fetchInstructors(ctx context.Context, courseIDs []int64) (map[int64][]course.Instructor, error) {

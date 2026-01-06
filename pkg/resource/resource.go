@@ -62,6 +62,16 @@ type ResourceClass struct {
 	Description string `json:"description"`
 }
 
+type CreateResourceClassInput struct {
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Description string `json:"description"`
+}
+
+type UpdateResourceClassInput struct {
+	Description *string `json:"description"`
+}
+
 type ResourceOwnerType string
 
 const (
@@ -72,12 +82,12 @@ const (
 )
 
 type ResourceSet struct {
-	ID              int64              `json:"id"`
-	CourseID        int64              `json:"course_id"`
-	ResourceClassID int64              `json:"resource_class_id"`
-	OwnerType       ResourceOwnerType  `json:"owner_type"`
-	Spec            json.RawMessage    `json:"spec"`
-	Status          json.RawMessage    `json:"status"`
+	ID              int64             `json:"id"`
+	CourseID        int64             `json:"course_id"`
+	ResourceClassID int64             `json:"resource_class_id"`
+	OwnerType       ResourceOwnerType `json:"owner_type"`
+	Spec            json.RawMessage   `json:"spec"`
+	Status          json.RawMessage   `json:"status"`
 
 	// some extra metadata
 	CreatedAt   time.Time `json:"created_at"`
@@ -88,6 +98,7 @@ type Resource struct {
 	ID              int64           `json:"id"`
 	ResourceSetID   int64           `json:"resource_set_id"`
 	ResourceClassID int64           `json:"resource_class_id"`
+	OwnerID         int64           `json:"owner_id"`
 	Spec            json.RawMessage `json:"spec"`
 	Status          json.RawMessage `json:"status"`
 

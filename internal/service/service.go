@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/vsamtuc/mcm/pkg/application"
 	"github.com/vsamtuc/mcm/pkg/auth"
 	"github.com/vsamtuc/mcm/pkg/course"
+	"github.com/vsamtuc/mcm/pkg/resource"
 	"github.com/vsamtuc/mcm/pkg/store"
 )
 
@@ -321,6 +323,135 @@ func (s *Service) TeamRemoveMember(ctx context.Context, teamID int64, studentID 
 		return course.Team{}, err
 	}
 	return s.store.RemoveTeamMember(ctx, teamID, studentID)
+}
+
+func (s *Service) AllocateResource(ctx context.Context, resourceSetID int64, spec map[string]interface{}) (resource.Resource, error) {
+	return s.AllocateResourceForOwner(ctx, resourceSetID, 0, spec)
+}
+
+func (s *Service) AllocateResourceForOwner(ctx context.Context, resourceSetID int64, ownerID int64, spec map[string]interface{}) (resource.Resource, error) {
+	specRaw, err := marshalSpec(spec)
+	if err != nil {
+		return resource.Resource{}, err
+	}
+	res := resource.Resource{
+		ResourceSetID: resourceSetID,
+		OwnerID:       ownerID,
+		Spec:          specRaw,
+		Status:        json.RawMessage(`{}`),
+	}
+	return s.store.CreateResource(ctx, res)
+}
+
+func (s *Service) ReleaseResource(ctx context.Context, resourceID int64) error {
+	return s.store.DeleteResource(ctx, resourceID)
+}
+
+func (s *Service) GetResource(ctx context.Context, id int64) (resource.Resource, error) {
+	return s.store.GetResource(ctx, id)
+}
+
+func (s *Service) ListResourcesByStudent(ctx context.Context, studentID int64) ([]resource.Resource, error) {
+	return s.listResourcesByOwner(ctx, studentID)
+}
+
+func (s *Service) ListResourcesByTeam(ctx context.Context, teamID int64) ([]resource.Resource, error) {
+	return s.listResourcesByOwner(ctx, teamID)
+}
+
+func (s *Service) ListCourseResources(ctx context.Context, courseID int64) ([]resource.Resource, error) {
+	sets, err := s.store.ListResourceSetsByCourse(ctx, courseID)
+	if err != nil {
+		return nil, err
+	}
+	return s.listResourcesForSets(ctx, sets, nil)
+}
+
+func (s *Service) ListResourcesBySet(ctx context.Context, resourceSetID int64) ([]resource.Resource, error) {
+	return s.store.ListResourcesBySet(ctx, resourceSetID)
+}
+
+func (s *Service) CreateResourceSet(ctx context.Context, courseID int64, rcID int64, ownerType resource.ResourceOwnerType, spec map[string]interface{}) (resource.ResourceSet, error) {
+	specRaw, err := marshalSpec(spec)
+	if err != nil {
+		return resource.ResourceSet{}, err
+	}
+	rs := resource.ResourceSet{
+		CourseID:        courseID,
+		ResourceClassID: rcID,
+		OwnerType:       ownerType,
+		Spec:            specRaw,
+		Status:          json.RawMessage(`{}`),
+	}
+	return s.store.CreateResourceSet(ctx, rs)
+}
+
+func (s *Service) ListResourceSetsByCourse(ctx context.Context, courseID int64) ([]resource.ResourceSet, error) {
+	return s.store.ListResourceSetsByCourse(ctx, courseID)
+}
+
+func (s *Service) ListResourceSetsByClass(ctx context.Context, resourceClassID int64) ([]resource.ResourceSet, error) {
+	return s.store.ListResourceSetsByClass(ctx, resourceClassID)
+}
+
+func (s *Service) ListResourceClasses(ctx context.Context) ([]resource.ResourceClass, error) {
+	return s.store.ListResourceClasses(ctx)
+}
+
+func marshalSpec(spec map[string]interface{}) (json.RawMessage, error) {
+	if spec == nil {
+		return json.RawMessage(`{}`), nil
+	}
+	data, err := json.Marshal(spec)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return json.RawMessage(`{}`), nil
+	}
+	return data, nil
+}
+
+func (s *Service) listResourcesByOwner(ctx context.Context, ownerID int64) ([]resource.Resource, error) {
+	sets, err := s.allResourceSets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.listResourcesForSets(ctx, sets, func(r resource.Resource, _ resource.ResourceSet) bool {
+		return r.OwnerID == ownerID
+	})
+}
+
+func (s *Service) allResourceSets(ctx context.Context) ([]resource.ResourceSet, error) {
+	courses, err := s.store.ListCourses(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]resource.ResourceSet, 0)
+	for _, c := range courses {
+		sets, err := s.store.ListResourceSetsByCourse(ctx, c.ID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, sets...)
+	}
+	return result, nil
+}
+
+func (s *Service) listResourcesForSets(ctx context.Context, sets []resource.ResourceSet, filter func(resource.Resource, resource.ResourceSet) bool) ([]resource.Resource, error) {
+	items := make([]resource.Resource, 0)
+	for _, rs := range sets {
+		resources, err := s.store.ListResourcesBySet(ctx, rs.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range resources {
+			if filter == nil || filter(r, rs) {
+				items = append(items, r)
+			}
+		}
+	}
+	return items, nil
 }
 
 var _ application.Service = (*Service)(nil)

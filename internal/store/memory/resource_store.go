@@ -142,6 +142,19 @@ func (s *ResourceStore) ListResourceSetsByCourse(ctx context.Context, courseID i
 	return out, nil
 }
 
+func (s *ResourceStore) ListResourceSetsByClass(ctx context.Context, resourceClassID int64) ([]resource.ResourceSet, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]resource.ResourceSet, 0)
+	for _, rs := range s.sets {
+		if rs.ResourceClassID == resourceClassID {
+			out = append(out, rs)
+		}
+	}
+	return out, nil
+}
+
 func (s *ResourceStore) UpdateResourceSet(ctx context.Context, rs resource.ResourceSet) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

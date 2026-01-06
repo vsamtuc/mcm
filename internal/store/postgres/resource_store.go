@@ -152,6 +152,28 @@ func (s *ResourceStore) ListResourceSetsByCourse(ctx context.Context, courseID i
 	return out, rows.Err()
 }
 
+func (s *ResourceStore) ListResourceSetsByClass(ctx context.Context, resourceClassID int64) ([]resource.ResourceSet, error) {
+	rows, err := s.db.QueryContext(ctx, `
+        SELECT id, course_id, resource_class_id, owner_type, spec, status, created_at, last_updated
+        FROM resource_sets
+        WHERE resource_class_id = $1
+        ORDER BY id`, resourceClassID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []resource.ResourceSet
+	for rows.Next() {
+		var rs resource.ResourceSet
+		if err := rows.Scan(&rs.ID, &rs.CourseID, &rs.ResourceClassID, &rs.OwnerType, &rs.Spec, &rs.Status, &rs.CreatedAt, &rs.LastUpdated); err != nil {
+			return nil, err
+		}
+		out = append(out, rs)
+	}
+	return out, rows.Err()
+}
+
 func (s *ResourceStore) UpdateResourceSet(ctx context.Context, rs resource.ResourceSet) error {
 	if rs.Spec == nil {
 		rs.Spec = []byte("{}")

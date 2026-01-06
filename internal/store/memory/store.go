@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vsamtuc/mcm/pkg/course"
+	"github.com/vsamtuc/mcm/pkg/resource"
 	"github.com/vsamtuc/mcm/pkg/store"
 )
 
@@ -26,6 +27,7 @@ type Store struct {
 	enrollments       map[int64]map[int64]struct{}
 	teams             map[int64]course.Team
 	teamMembers       map[int64]map[int64]struct{}
+	resources         *ResourceStore
 }
 
 // New creates an empty memory store instance.
@@ -42,6 +44,7 @@ func New() *Store {
 		enrollments:       make(map[int64]map[int64]struct{}),
 		teams:             make(map[int64]course.Team),
 		teamMembers:       make(map[int64]map[int64]struct{}),
+		resources:         NewResourceStore(),
 	}
 }
 
@@ -402,6 +405,120 @@ func (s *Store) RemoveTeamMember(ctx context.Context, teamID int64, studentID in
 	}
 	delete(members, studentID)
 	return team, nil
+}
+
+// Resource store delegation
+
+func (s *Store) CreateResourceClass(ctx context.Context, rc resource.ResourceClass) (resource.ResourceClass, error) {
+	if err := ctx.Err(); err != nil {
+		return resource.ResourceClass{}, err
+	}
+	return s.resources.CreateResourceClass(ctx, rc)
+}
+
+func (s *Store) GetResourceClass(ctx context.Context, id int64) (resource.ResourceClass, error) {
+	if err := ctx.Err(); err != nil {
+		return resource.ResourceClass{}, err
+	}
+	return s.resources.GetResourceClass(ctx, id)
+}
+
+func (s *Store) ListResourceClasses(ctx context.Context) ([]resource.ResourceClass, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.resources.ListResourceClasses(ctx)
+}
+
+func (s *Store) UpdateResourceClass(ctx context.Context, rc resource.ResourceClass) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.resources.UpdateResourceClass(ctx, rc)
+}
+
+func (s *Store) DeleteResourceClass(ctx context.Context, id int64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.resources.DeleteResourceClass(ctx, id)
+}
+
+func (s *Store) CreateResourceSet(ctx context.Context, rs resource.ResourceSet) (resource.ResourceSet, error) {
+	if err := ctx.Err(); err != nil {
+		return resource.ResourceSet{}, err
+	}
+	return s.resources.CreateResourceSet(ctx, rs)
+}
+
+func (s *Store) GetResourceSet(ctx context.Context, id int64) (resource.ResourceSet, error) {
+	if err := ctx.Err(); err != nil {
+		return resource.ResourceSet{}, err
+	}
+	return s.resources.GetResourceSet(ctx, id)
+}
+
+func (s *Store) ListResourceSetsByCourse(ctx context.Context, courseID int64) ([]resource.ResourceSet, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.resources.ListResourceSetsByCourse(ctx, courseID)
+}
+
+func (s *Store) ListResourceSetsByClass(ctx context.Context, resourceClassID int64) ([]resource.ResourceSet, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.resources.ListResourceSetsByClass(ctx, resourceClassID)
+}
+
+func (s *Store) UpdateResourceSet(ctx context.Context, rs resource.ResourceSet) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.resources.UpdateResourceSet(ctx, rs)
+}
+
+func (s *Store) DeleteResourceSet(ctx context.Context, id int64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.resources.DeleteResourceSet(ctx, id)
+}
+
+func (s *Store) CreateResource(ctx context.Context, r resource.Resource) (resource.Resource, error) {
+	if err := ctx.Err(); err != nil {
+		return resource.Resource{}, err
+	}
+	return s.resources.CreateResource(ctx, r)
+}
+
+func (s *Store) GetResource(ctx context.Context, id int64) (resource.Resource, error) {
+	if err := ctx.Err(); err != nil {
+		return resource.Resource{}, err
+	}
+	return s.resources.GetResource(ctx, id)
+}
+
+func (s *Store) ListResourcesBySet(ctx context.Context, resourceSetID int64) ([]resource.Resource, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.resources.ListResourcesBySet(ctx, resourceSetID)
+}
+
+func (s *Store) UpdateResource(ctx context.Context, r resource.Resource) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.resources.UpdateResource(ctx, r)
+}
+
+func (s *Store) DeleteResource(ctx context.Context, id int64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.resources.DeleteResource(ctx, id)
 }
 
 var _ store.Store = (*Store)(nil)

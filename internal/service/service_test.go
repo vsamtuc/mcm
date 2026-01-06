@@ -8,6 +8,7 @@ import (
 	memorystore "github.com/vsamtuc/mcm/internal/store/memory"
 	"github.com/vsamtuc/mcm/pkg/auth"
 	"github.com/vsamtuc/mcm/pkg/course"
+	"github.com/vsamtuc/mcm/pkg/resource"
 	"github.com/vsamtuc/mcm/pkg/store"
 )
 
@@ -219,4 +220,68 @@ func (s *stubStore) AddTeamMember(ctx context.Context, teamID int64, studentID i
 
 func (s *stubStore) RemoveTeamMember(ctx context.Context, teamID int64, studentID int64) (course.Team, error) {
 	return course.Team{}, nil
+}
+
+func (s *stubStore) CreateResourceClass(ctx context.Context, rc resource.ResourceClass) (resource.ResourceClass, error) {
+	return rc, nil
+}
+
+func (s *stubStore) GetResourceClass(ctx context.Context, id int64) (resource.ResourceClass, error) {
+	return resource.ResourceClass{}, nil
+}
+
+func (s *stubStore) ListResourceClasses(ctx context.Context) ([]resource.ResourceClass, error) {
+	return nil, nil
+}
+
+func (s *stubStore) UpdateResourceClass(ctx context.Context, rc resource.ResourceClass) error {
+	return nil
+}
+
+func (s *stubStore) DeleteResourceClass(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (s *stubStore) CreateResourceSet(ctx context.Context, rs resource.ResourceSet) (resource.ResourceSet, error) {
+	return rs, nil
+}
+
+func (s *stubStore) GetResourceSet(ctx context.Context, id int64) (resource.ResourceSet, error) {
+	return resource.ResourceSet{}, nil
+}
+
+func (s *stubStore) ListResourceSetsByCourse(ctx context.Context, courseID int64) ([]resource.ResourceSet, error) {
+	return nil, nil
+}
+
+func (s *stubStore) ListResourceSetsByClass(ctx context.Context, resourceClassID int64) ([]resource.ResourceSet, error) {
+	return nil, nil
+}
+
+func (s *stubStore) UpdateResourceSet(ctx context.Context, rs resource.ResourceSet) error {
+	return nil
+}
+
+func (s *stubStore) DeleteResourceSet(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (s *stubStore) CreateResource(ctx context.Context, r resource.Resource) (resource.Resource, error) {
+	return r, nil
+}
+
+func (s *stubStore) GetResource(ctx context.Context, id int64) (resource.Resource, error) {
+	return resource.Resource{}, nil
+}
+
+func (s *stubStore) ListResourcesBySet(ctx context.Context, resourceSetID int64) ([]resource.Resource, error) {
+	return nil, nil
+}
+
+func (s *stubStore) UpdateResource(ctx context.Context, r resource.Resource) error {
+	return nil
+}
+
+func (s *stubStore) DeleteResource(ctx context.Context, id int64) error {
+	return nil
 }

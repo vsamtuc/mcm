@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/vsamtuc/mcm/pkg/course"
+	"github.com/vsamtuc/mcm/pkg/resource"
 )
 
 // Store abstracts persistence for all domain entities.
@@ -18,7 +19,7 @@ type Store interface {
 	ListProfessors(ctx context.Context) ([]course.Professor, error)
 	ProfessorCourses(ctx context.Context, professorID int64) ([]course.Course, error)
 
-	// FindProfessorIDBySubject returns the professor ID associated with 
+	// FindProfessorIDBySubject returns the professor ID associated with
 	// the given subject (keycloak ID).
 	FindProfessorIDBySubject(ctx context.Context, subject string) (int64, error)
 
@@ -33,4 +34,6 @@ type Store interface {
 	DeleteTeam(ctx context.Context, teamID int64) error
 	AddTeamMember(ctx context.Context, teamID int64, studentID int64) (course.Team, error)
 	RemoveTeamMember(ctx context.Context, teamID int64, studentID int64) (course.Team, error)
+
+	resource.Store
 }
